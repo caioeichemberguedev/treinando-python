@@ -1,6 +1,10 @@
 import random
 import sys
 
+COR_TXT_ERRO = "\033[91m"
+COR_TXT_ATENCAO = "\033[33m"
+COR_TXT_NORMAL = '\033[0m'
+COR_TXT_SUCESSO = '\033[92m'
 
 def ajuda():
     print("Escolha um time pelo número.")
@@ -14,14 +18,18 @@ def sortear_campeao(times):
 if __name__ == '__main__':
 
     times = [
-        "Corinthians",
-        "Palmeiras",
         "São Paulo",
+        "Palmeiras",
+        "Corinthians",
         "Santos",
         "Flamengo",
         "Vasco",
+        "Botafogo",
+        "Fluminense",
         "Grêmio",
-        "Internacional"
+        "Internacional",
+        "Cruzeiro",
+        "Atlético-MG"
     ]
 
     if len(sys.argv) < 2:
@@ -30,7 +38,7 @@ if __name__ == '__main__':
         escolha = int(sys.argv[1])
 
         if escolha < 1 or escolha > len(times):
-            print("Time inválido!")
+            print(COR_TXT_ERRO, "Time inválido!", COR_TXT_NORMAL)
         else:
             time_escolhido = times[escolha - 1]
 
@@ -41,6 +49,6 @@ if __name__ == '__main__':
             print("🏆 Campeão da Copa do Brasil:", campeao)
 
             if time_escolhido == campeao:
-                print("🎉 PARABÉNS! Você foi campeão!")
+                print(COR_TXT_SUCESSO, "🎉 PARABÉNS! Você foi campeão!", COR_TXT_NORMAL)
             else:
-                print("😢 Você não foi campeão.")
+                print(COR_TXT_ATENCAO, "😢 Você não foi campeão.", COR_TXT_NORMAL)
