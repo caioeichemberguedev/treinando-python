@@ -1,6 +1,6 @@
 import random
-import sys
 import os
+import json
 
 class COR_TXT:
     ERRO = "\033[91m"
@@ -8,11 +8,51 @@ class COR_TXT:
     NORMAL = '\033[0m'
     SUCESSO = '\033[92m'
 
-def ajuda():
-    print("Escolha um time pelo número.")
-    print("Exemplo: python futebol.py 2")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
+ARQUIVO_SALVO = os.path.join(BASE_DIR, "jogo_salvo.json")
 
 CANTOS = {1: "canto esquerdo", 2: "meio", 3: "canto direito"}
+
+EQUIPES_PADRAO = {
+    "Copa do Brasil": [
+        "São Paulo",
+        "Palmeiras",
+        "Corinthians",
+        "Santos",
+        "Flamengo",
+        "Vasco",
+        "Botafogo",
+        "Fluminense",
+        "Grêmio",
+        "Internacional",
+        "Cruzeiro",
+        "Atlético-MG",
+        "Bahia",
+        "Vitória",
+        "Athletico-PR",
+        "Coritiba",
+    ],
+    "Copa do Mundo 2026": [
+        "Brasil",
+        "Argentina",
+        "Uruguai",
+        "Paraguai",
+        "França",
+        "Espanha",
+        "Alemanha",
+        "Inglaterra",
+        "Itália",
+        "Holanda",
+        "Portugal",
+        "Croácia",
+        "Marrocos",
+        "Bélgica",
+        "Noruega",
+        "Suíça",
+    ],
+}
+
 
 def escolher_canto(mensagem):
     while True:
@@ -129,10 +169,10 @@ def disputa_penaltis(time_a, time_b, interativo=False):
 
 
 NOMES_FASE = {
-    1: "Final - Copa do Mundo 2026",
-    2: "Semifinal - Copa do Mundo 2026",
-    4: "Quartas de Final - Copa do Mundo 2026",
-    8: "Oitavas de Final - Copa do Mundo 2026",
+    1: "Final",
+    2: "Semifinal",
+    4: "Quartas de Final",
+    8: "Oitavas de Final",
     16: "16-avos de Final",
     32: "32-avos de Final",
 }
@@ -142,17 +182,19 @@ def nome_da_fase(num_confrontos):
     return NOMES_FASE.get(num_confrontos, f"Rodada de {num_confrontos * 2}")
 
 
-def gerar_rodadas(times, time_escolhido=None):
+def gerar_rodadas(classificados, time_escolhido=None, campeonato=""):
     """Gera as rodadas eliminatórias uma a uma (lazy), até sobrar um campeão.
 
-    Cada rodada produzida é uma tupla (nome_fase, confrontos), em que
-    `confrontos` é uma lista de tuplas (time_a, time_b, vencedor).
-    A última rodada gerada tem sempre um único confronto: a final.
-    Confrontos com `time_escolhido` são decididos por pênaltis; os demais
-    (sem jogador humano) saem direto no sorteio.
+    `classificados` já deve estar na ordem do chaveamento (embaralhada para um
+    jogo novo, ou como estava salva para retomar um jogo em andamento).
+    Cada rodada produzida é uma tupla (nome_fase, confrontos, proximos), em que
+    `confrontos` é uma lista de tuplas (time_a, time_b, vencedor, gols_a, gols_b)
+    e `proximos` é a lista de times que avançam para a próxima fase (usada para
+    salvar o progresso do jogo).
+    Confrontos com `time_escolhido` são decididos por pênaltis interativos; os
+    demais (sem jogador humano) são simulados automaticamente pelo mesmo modelo.
     """
-    classificados = list(times)
-    random.shuffle(classificados)
+    classificados = list(classificados)
 
     while len(classificados) > 1:
         proxima_fase = []
@@ -165,6 +207,8 @@ def gerar_rodadas(times, time_escolhido=None):
             classificados = classificados[:-1]
 
         nome_fase = nome_da_fase(len(classificados) // 2)
+        if campeonato:
+            nome_fase = f"{nome_fase} - {campeonato}"
 
         for i in range(0, len(classificados), 2):
             time_a, time_b = classificados[i], classificados[i + 1]
@@ -186,7 +230,7 @@ def gerar_rodadas(times, time_escolhido=None):
         if avanca_direto is not None:
             proxima_fase.append(avanca_direto)
 
-        yield nome_fase, confrontos
+        yield nome_fase, confrontos, list(proxima_fase)
         classificados = proxima_fase
 
 
@@ -200,69 +244,190 @@ def exibir_rodada(nome_fase, confrontos):
         print(f"{time_a:<{largura_a}} {gols_a} x {gols_b} {time_b:<{largura_b}} -> {vencedor}")
 
 
-if __name__ == '__main__':
+def carregar_equipes():
+    if os.path.exists(ARQUIVO_EQUIPES):
+        with open(ARQUIVO_EQUIPES, "r", encoding="utf-8") as arquivo:
+            return json.load(arquivo)
+    equipes = {campeonato: list(times) for campeonato, times in EQUIPES_PADRAO.items()}
+    salvar_equipes(equipes)
+    return equipes
 
-    times1 = [
-        "São Paulo",
-        "Palmeiras",
-        "Corinthians",
-        "Santos",
-        "Flamengo",
-        "Vasco",
-        "Botafogo",
-        "Fluminense",
-        "Grêmio",
-        "Internacional",
-        "Cruzeiro",
-        "Atlético-MG",
-        "Bahia",
-        "Vitória",
-        "Athletico-PR",
-        "Coritiba"
-    ]
 
-    times = [
-    "Brasil",
-    "Argentina",
-    "Uruguai",
-    "Paraguai",
-    "França",
-    "Espanha",
-    "Alemanha",
-    "Inglaterra",
-    "Itália",
-    "Holanda",
-    "Portugal",
-    "Croácia",
-    "Marrocos",
-    "Bélgica",
-    "Noruega",
-    "Suíça"
-    ]
+def salvar_equipes(equipes):
+    with open(ARQUIVO_EQUIPES, "w", encoding="utf-8") as arquivo:
+        json.dump(equipes, arquivo, ensure_ascii=False, indent=2)
 
-    if len(sys.argv) < 2:
-        ajuda()
-    else:
-        escolha = int(sys.argv[1])
 
-        if escolha < 1 or escolha > len(times):
-            print(COR_TXT.ERRO, "Time inválido!", COR_TXT.NORMAL)
-        else:
-            time_escolhido = times[escolha - 1]
-            os.system('cls')
-            print("Seu time:", time_escolhido)
+def salvar_jogo(campeonato, time_escolhido, classificados):
+    dados = {
+        "campeonato": campeonato,
+        "time_escolhido": time_escolhido,
+        "classificados": classificados,
+    }
+    with open(ARQUIVO_SALVO, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, ensure_ascii=False, indent=2)
 
-            campeao = None
-            for nome_fase, confrontos in gerar_rodadas(times, time_escolhido):
-                exibir_rodada(nome_fase, confrontos)
-                if len(confrontos) == 1:
-                    campeao = confrontos[0][2]
 
-            print("\n🏆 Campeão da Copa do Brasil:", campeao)
+def carregar_jogo_salvo():
+    if not os.path.exists(ARQUIVO_SALVO):
+        return None
+    with open(ARQUIVO_SALVO, "r", encoding="utf-8") as arquivo:
+        return json.load(arquivo)
 
+
+def apagar_jogo_salvo():
+    if os.path.exists(ARQUIVO_SALVO):
+        os.remove(ARQUIVO_SALVO)
+
+
+def escolher_numero(mensagem, minimo, maximo):
+    while True:
+        entrada = input(mensagem)
+        if entrada.isdigit() and minimo <= int(entrada) <= maximo:
+            return int(entrada)
+        print(COR_TXT.ERRO, f"Escolha um número entre {minimo} e {maximo}.", COR_TXT.NORMAL)
+
+
+def escolher_campeonato(equipes):
+    nomes = list(equipes.keys())
+    print("\nEscolha o campeonato:")
+    for indice, nome in enumerate(nomes, start=1):
+        print(f"{indice} - {nome}")
+    escolha = escolher_numero("> ", 1, len(nomes))
+    return nomes[escolha - 1]
+
+
+def escolher_time(times):
+    print("\nEscolha seu time:")
+    for indice, nome in enumerate(times, start=1):
+        print(f"{indice} - {nome}")
+    escolha = escolher_numero("> ", 1, len(times))
+    return times[escolha - 1]
+
+
+def rodar_campeonato(campeonato, time_escolhido, classificados):
+    os.system('cls')
+    print("Campeonato:", campeonato)
+    print("Seu time:", time_escolhido)
+
+    for nome_fase, confrontos, proximos in gerar_rodadas(classificados, time_escolhido, campeonato):
+        exibir_rodada(nome_fase, confrontos)
+
+        if len(proximos) == 1:
+            campeao = proximos[0]
+            apagar_jogo_salvo()
+            print(f"\n🏆 Campeão da {campeonato}:", campeao)
             if time_escolhido == campeao:
-                print(COR_TXT.SUCESSO, "🎉 PARABÉNS! Você foi campeão!",
-                      COR_TXT.NORMAL)
+                print(COR_TXT.SUCESSO, "🎉 PARABÉNS! Você foi campeão!", COR_TXT.NORMAL)
             else:
-                print(COR_TXT.ATENCAO, "😢 Você não foi campeão.",
-                      COR_TXT.NORMAL)
+                print(COR_TXT.ATENCAO, "😢 Você não foi campeão.", COR_TXT.NORMAL)
+            return
+
+        escolha = input("\nENTER para a próxima fase, ou digite 'sair' para salvar e encerrar: ").strip().lower()
+        if escolha == "sair":
+            salvar_jogo(campeonato, time_escolhido, proximos)
+            print("\nJogo salvo! Use 'Carregar jogo' no menu para continuar depois.")
+            return
+
+
+def novo_jogo(equipes):
+    campeonato = escolher_campeonato(equipes)
+    times = equipes[campeonato]
+
+    if len(times) < 2:
+        print(COR_TXT.ERRO, "Esse campeonato precisa de pelo menos 2 equipes.", COR_TXT.NORMAL)
+        return
+
+    time_escolhido = escolher_time(times)
+    classificados = list(times)
+    random.shuffle(classificados)
+    rodar_campeonato(campeonato, time_escolhido, classificados)
+
+
+def carregar_jogo():
+    dados = carregar_jogo_salvo()
+    if dados is None:
+        print(COR_TXT.ATENCAO, "Nenhum jogo salvo encontrado.", COR_TXT.NORMAL)
+        return
+    rodar_campeonato(dados["campeonato"], dados["time_escolhido"], dados["classificados"])
+
+
+def editar_equipes(equipes):
+    while True:
+        campeonato = escolher_campeonato(equipes)
+        times = equipes[campeonato]
+
+        while True:
+            print(f"\n--- Equipes: {campeonato} ---")
+            for indice, nome in enumerate(times, start=1):
+                print(f"{indice} - {nome}")
+            print("\na - Adicionar equipe")
+            print("r - Remover equipe")
+            print("n - Renomear equipe")
+            print("v - Voltar")
+            opcao = input("> ").strip().lower()
+
+            if opcao == "a":
+                nome_novo = input("Nome da nova equipe: ").strip()
+                if not nome_novo:
+                    print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
+                elif nome_novo in times:
+                    print(COR_TXT.ERRO, "Essa equipe já existe.", COR_TXT.NORMAL)
+                else:
+                    times.append(nome_novo)
+                    salvar_equipes(equipes)
+            elif opcao == "r":
+                if not times:
+                    print(COR_TXT.ERRO, "Não há equipes para remover.", COR_TXT.NORMAL)
+                else:
+                    indice = escolher_numero("Número da equipe a remover: ", 1, len(times))
+                    removida = times.pop(indice - 1)
+                    salvar_equipes(equipes)
+                    print(f"Equipe '{removida}' removida.")
+            elif opcao == "n":
+                if not times:
+                    print(COR_TXT.ERRO, "Não há equipes para renomear.", COR_TXT.NORMAL)
+                else:
+                    indice = escolher_numero("Número da equipe a renomear: ", 1, len(times))
+                    nome_novo = input("Novo nome: ").strip()
+                    if nome_novo:
+                        times[indice - 1] = nome_novo
+                        salvar_equipes(equipes)
+                    else:
+                        print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
+            elif opcao == "v":
+                break
+            else:
+                print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
+
+        continuar = input("\nEditar outro campeonato? (s/n): ").strip().lower()
+        if continuar != "s":
+            break
+
+
+def menu_principal():
+    equipes = carregar_equipes()
+
+    while True:
+        print("\n=== Simulador de Copa ===")
+        print("1 - Novo jogo")
+        print("2 - Carregar jogo")
+        print("3 - Editar equipes")
+        print("4 - Sair")
+        opcao = input("> ").strip()
+
+        if opcao == "1":
+            novo_jogo(equipes)
+        elif opcao == "2":
+            carregar_jogo()
+        elif opcao == "3":
+            editar_equipes(equipes)
+        elif opcao == "4":
+            print("Até a próxima!")
+            break
+        else:
+            print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
+
+
+if __name__ == '__main__':
+    menu_principal()
