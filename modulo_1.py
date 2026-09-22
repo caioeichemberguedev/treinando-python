@@ -258,11 +258,13 @@ def salvar_equipes(equipes):
         json.dump(equipes, arquivo, ensure_ascii=False, indent=2)
 
 
-def salvar_jogo(campeonato, time_escolhido, classificados):
+def salvar_jogo(campeonato, time_escolhido, temporada, classificados, historico=None):
     dados = {
         "campeonato": campeonato,
         "time_escolhido": time_escolhido,
-        "classificados": classificados,
+        "temporada": temporada,
+        "classificados": classificados,  # None = temporada nova, ainda não sorteada
+        "historico": historico or [],  # temporadas já concluídas nesta carreira
     }
     with open(ARQUIVO_SALVO, "w", encoding="utf-8") as arquivo:
         json.dump(dados, arquivo, ensure_ascii=False, indent=2)
@@ -273,11 +275,6 @@ def carregar_jogo_salvo():
         return None
     with open(ARQUIVO_SALVO, "r", encoding="utf-8") as arquivo:
         return json.load(arquivo)
-
-
-def apagar_jogo_salvo():
-    if os.path.exists(ARQUIVO_SALVO):
-        os.remove(ARQUIVO_SALVO)
 
 
 def escolher_numero(mensagem, minimo, maximo):
@@ -305,32 +302,166 @@ def escolher_time(times):
     return times[escolha - 1]
 
 
-def rodar_campeonato(campeonato, time_escolhido, classificados):
+def montar_classificacao(fases):
+    """Reconstrói, a partir das fases de uma temporada, em que rodada cada
+    time foi eliminado (campeão e vice tratados à parte, na final).
+    Retorna uma lista de (rótulo, [times]) da melhor para a pior colocação.
+    """
+    grupos = []
+
+    for indice in range(len(fases) - 1, -1, -1):
+        nome_fase = fases[indice]["nome_fase"].split(" - ")[0]
+        confrontos = fases[indice]["confrontos"]
+
+        if indice == len(fases) - 1:
+            time_a, time_b, vencedor, _, _ = confrontos[0]
+            perdedor = time_b if vencedor == time_a else time_a
+            grupos.append(("Campeão", [vencedor]))
+            grupos.append(("Vice-campeão", [perdedor]))
+        else:
+            eliminados = []
+            for time_a, time_b, vencedor, _, _ in confrontos:
+                eliminados.append(time_b if vencedor == time_a else time_a)
+            grupos.append((nome_fase, eliminados))
+
+    return grupos
+
+
+def exibir_historico_jogos(historico):
+    if not historico:
+        print(COR_TXT.ATENCAO, "Nenhuma temporada concluída ainda.", COR_TXT.NORMAL)
+        return
+
+    print("\nTemporadas disputadas:")
+    for indice, temporada_info in enumerate(historico, start=1):
+        print(f"{indice} - Temporada {temporada_info['temporada']} (Campeão: {temporada_info['campeao']})")
+
+    indice = escolher_numero("Escolha uma temporada para ver os jogos: ", 1, len(historico))
+    for fase in historico[indice - 1]["fases"]:
+        exibir_rodada(fase["nome_fase"], fase["confrontos"])
+
+
+def exibir_campeoes(historico):
+    if not historico:
+        print(COR_TXT.ATENCAO, "Nenhum campeão ainda.", COR_TXT.NORMAL)
+        return
+
+    print("\n--- Campeões por temporada ---")
+    contagem = {}
+    for temporada_info in historico:
+        print(f"{temporada_info['temporada']}: {temporada_info['campeao']}")
+        contagem[temporada_info["campeao"]] = contagem.get(temporada_info["campeao"], 0) + 1
+
+    print("\n--- Títulos por time ---")
+    for time, titulos in sorted(contagem.items(), key=lambda item: -item[1]):
+        print(f"{time}: {titulos} título(s)")
+
+
+def exibir_classificacao(historico):
+    if not historico:
+        print(COR_TXT.ATENCAO, "Nenhuma temporada concluída ainda.", COR_TXT.NORMAL)
+        return
+
+    print("\nTemporadas disponíveis:")
+    for indice, temporada_info in enumerate(historico, start=1):
+        print(f"{indice} - Temporada {temporada_info['temporada']}")
+
+    indice = escolher_numero("Escolha uma temporada: ", 1, len(historico))
+    temporada_info = historico[indice - 1]
+
+    print(f"\n--- Classificação final: Temporada {temporada_info['temporada']} ---")
+    for rotulo, integrantes in montar_classificacao(temporada_info["fases"]):
+        print(f"{rotulo}: {', '.join(integrantes)}")
+
+
+def menu_pos_temporada(campeonato, temporada, campeao, historico):
+    """Mostrado ao fim de cada temporada. Retorna True se o jogador quiser
+    seguir direto para a próxima temporada, False para voltar ao menu principal.
+    """
+    while True:
+        print(f"\n=== Temporada {temporada} encerrada - {campeonato} ===")
+        print("Campeão:", campeao)
+        print("1 - Ver histórico de jogos")
+        print("2 - Ver times campeões")
+        print("3 - Ver classificação por temporada")
+        print("4 - Seguir para a próxima temporada")
+        print("5 - Voltar ao menu principal")
+        opcao = input("> ").strip()
+
+        if opcao == "1":
+            exibir_historico_jogos(historico)
+        elif opcao == "2":
+            exibir_campeoes(historico)
+        elif opcao == "3":
+            exibir_classificacao(historico)
+        elif opcao == "4":
+            return True
+        elif opcao == "5":
+            return False
+        else:
+            print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
+
+
+def rodar_temporada(campeonato, time_escolhido, temporada, classificados, times, historico=None):
+    historico = historico or []
+
+    if classificados is None:
+        if len(times) < 2:
+            print(COR_TXT.ERRO, "Esse campeonato não tem equipes suficientes para a nova temporada.", COR_TXT.NORMAL)
+            return
+        classificados = list(times)
+        random.shuffle(classificados)
+        salvar_jogo(campeonato, time_escolhido, temporada, classificados, historico)
+
     os.system('cls')
     print("Campeonato:", campeonato)
+    print("Temporada:", temporada)
     print("Seu time:", time_escolhido)
+
+    fases_da_temporada = []
 
     for nome_fase, confrontos, proximos in gerar_rodadas(classificados, time_escolhido, campeonato):
         exibir_rodada(nome_fase, confrontos)
+        fases_da_temporada.append({"nome_fase": nome_fase, "confrontos": confrontos})
 
         if len(proximos) == 1:
             campeao = proximos[0]
-            apagar_jogo_salvo()
-            print(f"\n🏆 Campeão da {campeonato}:", campeao)
+            print(f"\n🏆 Campeão da {campeonato} {temporada}:", campeao)
             if time_escolhido == campeao:
                 print(COR_TXT.SUCESSO, "🎉 PARABÉNS! Você foi campeão!", COR_TXT.NORMAL)
             else:
                 print(COR_TXT.ATENCAO, "😢 Você não foi campeão.", COR_TXT.NORMAL)
+
+            historico = historico + [{
+                "temporada": temporada,
+                "campeao": campeao,
+                "fases": fases_da_temporada,
+            }]
+
+            proxima_temporada = temporada + 1
+            salvar_jogo(campeonato, time_escolhido, proxima_temporada, None, historico)
+
+            if menu_pos_temporada(campeonato, temporada, campeao, historico):
+                rodar_temporada(campeonato, time_escolhido, proxima_temporada, None, times, historico)
             return
 
-        escolha = input("\nENTER para a próxima fase, ou digite 'sair' para salvar e encerrar: ").strip().lower()
+        salvar_jogo(campeonato, time_escolhido, temporada, proximos, historico)
+
+        escolha = input("\nENTER para a próxima fase, ou digite 'sair' para voltar ao menu: ").strip().lower()
         if escolha == "sair":
-            salvar_jogo(campeonato, time_escolhido, proximos)
-            print("\nJogo salvo! Use 'Carregar jogo' no menu para continuar depois.")
+            print("\nProgresso salvo! Use 'Carregar jogo' no menu para continuar depois.")
             return
 
 
 def novo_jogo(equipes):
+    if os.path.exists(ARQUIVO_SALVO):
+        confirmacao = input(
+            "Já existe uma carreira salva. Iniciar um novo jogo vai substituí-la. Confirmar? (s/n): "
+        ).strip().lower()
+        if confirmacao != "s":
+            print("Novo jogo cancelado.")
+            return
+
     campeonato = escolher_campeonato(equipes)
     times = equipes[campeonato]
 
@@ -339,17 +470,25 @@ def novo_jogo(equipes):
         return
 
     time_escolhido = escolher_time(times)
+    temporada = 2026
     classificados = list(times)
     random.shuffle(classificados)
-    rodar_campeonato(campeonato, time_escolhido, classificados)
+    salvar_jogo(campeonato, time_escolhido, temporada, classificados)
+    rodar_temporada(campeonato, time_escolhido, temporada, classificados, times)
 
 
-def carregar_jogo():
+def carregar_jogo(equipes):
     dados = carregar_jogo_salvo()
     if dados is None:
         print(COR_TXT.ATENCAO, "Nenhum jogo salvo encontrado.", COR_TXT.NORMAL)
         return
-    rodar_campeonato(dados["campeonato"], dados["time_escolhido"], dados["classificados"])
+
+    campeonato = dados["campeonato"]
+    times = equipes.get(campeonato, [])
+    historico = dados.get("historico", [])
+    rodar_temporada(
+        campeonato, dados["time_escolhido"], dados["temporada"], dados["classificados"], times, historico
+    )
 
 
 def editar_equipes(equipes):
@@ -409,6 +548,13 @@ def menu_principal():
     equipes = carregar_equipes()
 
     while True:
+        dados_salvos = carregar_jogo_salvo()
+        if dados_salvos:
+            print(
+                f"\nCarreira atual: {dados_salvos['time_escolhido']} — "
+                f"{dados_salvos['campeonato']} — Temporada {dados_salvos['temporada']}"
+            )
+
         print("\n=== Simulador de Copa ===")
         print("1 - Novo jogo")
         print("2 - Carregar jogo")
@@ -419,7 +565,7 @@ def menu_principal():
         if opcao == "1":
             novo_jogo(equipes)
         elif opcao == "2":
-            carregar_jogo()
+            carregar_jogo(equipes)
         elif opcao == "3":
             editar_equipes(equipes)
         elif opcao == "4":
