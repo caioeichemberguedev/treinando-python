@@ -5,12 +5,14 @@ from cores import COR_TXT
 from equipe import Equipe
 from campeonato import gerar_rodadas, exibir_rodada, montar_classificacao
 from persistencia import (
-    ARQUIVO_SALVO,
     carregar_equipes,
     salvar_equipes,
     salvar_jogo,
+    gerar_nome_save,
+    listar_saves,
     carregar_jogo_salvo,
     restaurar_equipes_padrao,
+    excluir_jogo_salvo,
 )
 
 
@@ -96,6 +98,27 @@ def exibir_classificacao(historico):
         print(f"{rotulo}: {', '.join(integrantes)}")
 
 
+def escolher_save(acao):
+    """Lista as carreiras salvas e deixa o jogador escolher uma pelo nome.
+    `acao` só entra no texto do prompt (ex.: "carregar", "excluir"). Retorna
+    o nome do save escolhido, ou None se não houver nenhuma carreira salva.
+    """
+    nomes = listar_saves()
+    if not nomes:
+        print(COR_TXT.ATENCAO, "Nenhuma carreira salva encontrada.", COR_TXT.NORMAL)
+        return None
+
+    print(f"\nCarreiras salvas para {acao}:")
+    for indice, nome in enumerate(nomes, start=1):
+        dados = carregar_jogo_salvo(nome)
+        print(
+            f"{indice} - {nome} — {dados['time_escolhido']} ({dados['campeonato']}) "
+            f"— Temporada {dados['temporada']}"
+        )
+    escolha = escolher_numero("> ", 1, len(nomes))
+    return nomes[escolha - 1]
+
+
 def menu_pos_temporada(campeonato, temporada, campeao, historico):
     """Mostrado ao fim de cada temporada. Retorna True se o jogador quiser
     seguir direto para a próxima temporada, False para voltar ao menu principal.
@@ -124,7 +147,7 @@ def menu_pos_temporada(campeonato, temporada, campeao, historico):
             print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
 
 
-def rodar_temporada(campeonato, time_escolhido, temporada, classificados, times, historico=None):
+def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classificados, times, historico=None):
     historico = historico or []
 
     if classificados is None:
@@ -133,7 +156,7 @@ def rodar_temporada(campeonato, time_escolhido, temporada, classificados, times,
             return
         classificados = list(times)
         random.shuffle(classificados)
-        salvar_jogo(campeonato, time_escolhido, temporada, classificados, historico)
+        salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico)
 
     os.system('cls')
     print("Campeonato:", campeonato)
@@ -168,13 +191,13 @@ def rodar_temporada(campeonato, time_escolhido, temporada, classificados, times,
             }]
 
             proxima_temporada = temporada + 1
-            salvar_jogo(campeonato, time_escolhido, proxima_temporada, None, historico)
+            salvar_jogo(nome_save, campeonato, time_escolhido, proxima_temporada, None, historico)
 
             if menu_pos_temporada(campeonato, temporada, campeao.nome, historico):
-                rodar_temporada(campeonato, time_escolhido, proxima_temporada, None, times, historico)
+                rodar_temporada(nome_save, campeonato, time_escolhido, proxima_temporada, None, times, historico)
             return
 
-        salvar_jogo(campeonato, time_escolhido, temporada, proximos, historico)
+        salvar_jogo(nome_save, campeonato, time_escolhido, temporada, proximos, historico)
 
         escolha = input("\nENTER para a próxima fase, ou digite 'sair' para voltar ao menu: ").strip().lower()
         if escolha == "sair":
@@ -183,14 +206,6 @@ def rodar_temporada(campeonato, time_escolhido, temporada, classificados, times,
 
 
 def novo_jogo(equipes):
-    if os.path.exists(ARQUIVO_SALVO):
-        confirmacao = input(
-            "Já existe uma carreira salva. Iniciar um novo jogo vai substituí-la. Confirmar? (s/n): "
-        ).strip().lower()
-        if confirmacao != "s":
-            print("Novo jogo cancelado.")
-            return
-
     campeonato = escolher_campeonato(equipes)
     times = equipes[campeonato]
 
@@ -202,21 +217,23 @@ def novo_jogo(equipes):
     temporada = 2026
     classificados = list(times)
     random.shuffle(classificados)
-    salvar_jogo(campeonato, time_escolhido, temporada, classificados)
-    rodar_temporada(campeonato, time_escolhido, temporada, classificados, times)
+    nome_save = gerar_nome_save()
+    salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados)
+    print(COR_TXT.SUCESSO, f"Nova carreira criada: {nome_save}", COR_TXT.NORMAL)
+    rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classificados, times)
 
 
 def carregar_jogo(equipes):
-    dados = carregar_jogo_salvo()
-    if dados is None:
-        print(COR_TXT.ATENCAO, "Nenhum jogo salvo encontrado.", COR_TXT.NORMAL)
+    nome_save = escolher_save("carregar")
+    if nome_save is None:
         return
 
+    dados = carregar_jogo_salvo(nome_save)
     campeonato = dados["campeonato"]
     times = equipes.get(campeonato, [])
     historico = dados.get("historico", [])
     rodar_temporada(
-        campeonato, dados["time_escolhido"], dados["temporada"], dados["classificados"], times, historico
+        nome_save, campeonato, dados["time_escolhido"], dados["temporada"], dados["classificados"], times, historico
     )
 
 
@@ -289,10 +306,10 @@ def editar_equipes(equipes):
                     else:
                         print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
             elif opcao == "e":
-                if carregar_jogo_salvo() is not None:
+                if listar_saves():
                     print(
                         COR_TXT.ERRO,
-                        "Não é possível editar finanças/fãs/força com uma carreira em andamento. "
+                        "Não é possível editar finanças/fãs/força com carreiras salvas em andamento. "
                         "Esses valores só mudam automaticamente conforme o jogador avança na carreira salva.",
                         COR_TXT.NORMAL,
                     )
@@ -316,19 +333,18 @@ def menu_principal():
     equipes = carregar_equipes()
 
     while True:
-        dados_salvos = carregar_jogo_salvo()
-        if dados_salvos:
-            print(
-                f"\nCarreira atual: {dados_salvos['time_escolhido']} — "
-                f"{dados_salvos['campeonato']} — Temporada {dados_salvos['temporada']}"
-            )
+        saves = listar_saves()
+        if saves:
+            plural = "s" if len(saves) != 1 else ""
+            print(f"\nVocê tem {len(saves)} carreira{plural} salva{plural}. Use 'Carregar jogo' para ver.")
 
         print("\n=== Simulador de Copa ===")
         print("1 - Novo jogo")
         print("2 - Carregar jogo")
         print("3 - Editar equipes")
         print("4 - Restaurar equipes para os valores padrão")
-        print("5 - Sair")
+        print("5 - Excluir jogo salvo")
+        print("6 - Sair")
         opcao = input("> ").strip()
 
         if opcao == "1":
@@ -348,6 +364,18 @@ def menu_principal():
             else:
                 print("Restauração cancelada.")
         elif opcao == "5":
+            nome_save = escolher_save("excluir")
+            if nome_save is not None:
+                confirmacao = input(
+                    f"Isso vai apagar a carreira '{nome_save}' (progresso da temporada e histórico). "
+                    "Confirmar? (s/n): "
+                ).strip().lower()
+                if confirmacao == "s":
+                    excluir_jogo_salvo(nome_save)
+                    print(COR_TXT.SUCESSO, "Jogo salvo excluído.", COR_TXT.NORMAL)
+                else:
+                    print("Exclusão cancelada.")
+        elif opcao == "6":
             print("Até a próxima!")
             break
         else:

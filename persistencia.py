@@ -1,11 +1,12 @@
 import os
 import json
+from datetime import date
 
 from equipe import Equipe
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
-ARQUIVO_SALVO = os.path.join(BASE_DIR, "jogo_salvo.json")
+DIR_SAVES = os.path.join(BASE_DIR, "saves")
 
 EQUIPES_PADRAO = {
     "Copa do Brasil": [
@@ -75,7 +76,41 @@ def salvar_equipes(equipes):
         json.dump(dados, arquivo, ensure_ascii=False, indent=2)
 
 
-def salvar_jogo(campeonato, time_escolhido, temporada, classificados, historico=None):
+def _caminho_save(nome_save):
+    return os.path.join(DIR_SAVES, f"{nome_save}.json")
+
+
+def gerar_nome_save():
+    """Gera um nome único para uma nova carreira, no formato
+    "numero_dia_mes_ano" (ex.: "1_23_09_2026"), permitindo que várias
+    carreiras existam salvas ao mesmo tempo e sejam distinguidas facilmente.
+    """
+    maior_numero = 0
+    if os.path.isdir(DIR_SAVES):
+        for nome_arquivo in os.listdir(DIR_SAVES):
+            prefixo = nome_arquivo.split("_", 1)[0]
+            if prefixo.isdigit():
+                maior_numero = max(maior_numero, int(prefixo))
+
+    hoje = date.today()
+    return f"{maior_numero + 1}_{hoje.day:02d}_{hoje.month:02d}_{hoje.year}"
+
+
+def listar_saves():
+    """Lista os nomes das carreiras salvas, da mais antiga para a mais nova."""
+    if not os.path.isdir(DIR_SAVES):
+        return []
+
+    nomes = [nome_arquivo[:-5] for nome_arquivo in os.listdir(DIR_SAVES) if nome_arquivo.endswith(".json")]
+
+    def numero_do_save(nome):
+        prefixo = nome.split("_", 1)[0]
+        return int(prefixo) if prefixo.isdigit() else 0
+
+    return sorted(nomes, key=numero_do_save)
+
+
+def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None):
     dados = {
         "campeonato": campeonato,
         "time_escolhido": time_escolhido.to_dict(),
@@ -84,18 +119,20 @@ def salvar_jogo(campeonato, time_escolhido, temporada, classificados, historico=
         "classificados": [equipe.to_dict() for equipe in classificados] if classificados is not None else None,
         "historico": historico or [],  # temporadas já concluídas nesta carreira
     }
-    with open(ARQUIVO_SALVO, "w", encoding="utf-8") as arquivo:
+    os.makedirs(DIR_SAVES, exist_ok=True)
+    with open(_caminho_save(nome_save), "w", encoding="utf-8") as arquivo:
         json.dump(dados, arquivo, ensure_ascii=False, indent=2)
 
 
-def carregar_jogo_salvo():
-    """Lê o save em disco e já reconstrói `time_escolhido`/`classificados`
-    como objetos `Equipe`. Retorna None se não houver jogo salvo.
+def carregar_jogo_salvo(nome_save):
+    """Lê uma carreira salva específica e já reconstrói `time_escolhido`/
+    `classificados` como objetos `Equipe`. Retorna None se não existir.
     """
-    if not os.path.exists(ARQUIVO_SALVO):
+    caminho = _caminho_save(nome_save)
+    if not os.path.exists(caminho):
         return None
 
-    with open(ARQUIVO_SALVO, "r", encoding="utf-8") as arquivo:
+    with open(caminho, "r", encoding="utf-8") as arquivo:
         dados = json.load(arquivo)
 
     dados["time_escolhido"] = Equipe.from_dict(dados["time_escolhido"])
@@ -103,3 +140,12 @@ def carregar_jogo_salvo():
         dados["classificados"] = [Equipe.from_dict(item) for item in dados["classificados"]]
 
     return dados
+
+
+def excluir_jogo_salvo(nome_save):
+    """Apaga uma carreira salva específica. Retorna True se ela existia."""
+    caminho = _caminho_save(nome_save)
+    if not os.path.exists(caminho):
+        return False
+    os.remove(caminho)
+    return True
