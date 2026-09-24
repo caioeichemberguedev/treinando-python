@@ -10,15 +10,23 @@ from persistencia import (
     salvar_equipes,
     salvar_jogo,
     carregar_jogo_salvo,
+    restaurar_equipes_padrao,
 )
 
 
-def escolher_numero(mensagem, minimo, maximo):
+def escolher_valor(mensagem, minimo, maximo=None):
     while True:
         entrada = input(mensagem)
-        if entrada.isdigit() and minimo <= int(entrada) <= maximo:
-            return int(entrada)
-        print(COR_TXT.ERRO, f"Escolha um número entre {minimo} e {maximo}.", COR_TXT.NORMAL)
+        if entrada.isdigit():
+            valor = int(entrada)
+            if valor >= minimo and (maximo is None or valor <= maximo):
+                return valor
+        limite = f" e {maximo}" if maximo is not None else " ou mais"
+        print(COR_TXT.ERRO, f"Digite um número inteiro entre {minimo}{limite}.", COR_TXT.NORMAL)
+
+
+def escolher_numero(mensagem, minimo, maximo):
+    return escolher_valor(mensagem, minimo, maximo)
 
 
 def escolher_campeonato(equipes):
@@ -35,7 +43,7 @@ def escolher_time(times):
     for indice, equipe in enumerate(times, start=1):
         print(
             f"{indice} - {equipe.nome} "
-            f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | 🏆 {equipe.titulos})"
+            f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | ⚡ {equipe.forca}/100 | 🏆 {equipe.titulos})"
         )
     escolha = escolher_numero("> ", 1, len(times))
     return times[escolha - 1]
@@ -212,6 +220,27 @@ def carregar_jogo(equipes):
     )
 
 
+def editar_valores_equipe(equipe):
+    while True:
+        print(f"\n--- Editar {equipe.nome} ---")
+        print(f"1 - Finanças (atual: R$ {equipe.financas:,})")
+        print(f"2 - Fãs (atual: {equipe.fas:,})")
+        print(f"3 - Força (atual: {equipe.forca}/100)")
+        print("v - Voltar")
+        opcao = input("> ").strip().lower()
+
+        if opcao == "1":
+            equipe.financas = escolher_valor("Novo valor de finanças (R$): ", 0)
+        elif opcao == "2":
+            equipe.fas = escolher_valor("Novo valor de fãs: ", 0)
+        elif opcao == "3":
+            equipe.forca = escolher_valor("Nova força (0 a 100): ", 0, 100)
+        elif opcao == "v":
+            return
+        else:
+            print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
+
+
 def editar_equipes(equipes):
     while True:
         campeonato = escolher_campeonato(equipes)
@@ -222,11 +251,12 @@ def editar_equipes(equipes):
             for indice, equipe in enumerate(times, start=1):
                 print(
                     f"{indice} - {equipe.nome} "
-                    f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | 🏆 {equipe.titulos})"
+                    f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | ⚡ {equipe.forca}/100 | 🏆 {equipe.titulos})"
                 )
             print("\na - Adicionar equipe")
             print("r - Remover equipe")
             print("n - Renomear equipe")
+            print("e - Editar finanças/fãs/força")
             print("v - Voltar")
             opcao = input("> ").strip().lower()
 
@@ -258,6 +288,20 @@ def editar_equipes(equipes):
                         salvar_equipes(equipes)
                     else:
                         print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
+            elif opcao == "e":
+                if carregar_jogo_salvo() is not None:
+                    print(
+                        COR_TXT.ERRO,
+                        "Não é possível editar finanças/fãs/força com uma carreira em andamento. "
+                        "Esses valores só mudam automaticamente conforme o jogador avança na carreira salva.",
+                        COR_TXT.NORMAL,
+                    )
+                elif not times:
+                    print(COR_TXT.ERRO, "Não há equipes para editar.", COR_TXT.NORMAL)
+                else:
+                    indice = escolher_numero("Número da equipe a editar: ", 1, len(times))
+                    editar_valores_equipe(times[indice - 1])
+                    salvar_equipes(equipes)
             elif opcao == "v":
                 break
             else:
@@ -283,7 +327,8 @@ def menu_principal():
         print("1 - Novo jogo")
         print("2 - Carregar jogo")
         print("3 - Editar equipes")
-        print("4 - Sair")
+        print("4 - Restaurar equipes para os valores padrão")
+        print("5 - Sair")
         opcao = input("> ").strip()
 
         if opcao == "1":
@@ -293,6 +338,16 @@ def menu_principal():
         elif opcao == "3":
             editar_equipes(equipes)
         elif opcao == "4":
+            confirmacao = input(
+                "Isso vai apagar todas as edições de elenco, finanças, fãs e força feitas até agora "
+                "(o jogo salvo em andamento não é afetado). Confirmar? (s/n): "
+            ).strip().lower()
+            if confirmacao == "s":
+                equipes = restaurar_equipes_padrao()
+                print(COR_TXT.SUCESSO, "Equipes restauradas para os valores padrão.", COR_TXT.NORMAL)
+            else:
+                print("Restauração cancelada.")
+        elif opcao == "5":
             print("Até a próxima!")
             break
         else:

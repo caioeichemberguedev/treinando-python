@@ -56,6 +56,14 @@ def carregar_equipes():
             for campeonato, times in dados.items()
         }
 
+    return restaurar_equipes_padrao()
+
+
+def restaurar_equipes_padrao():
+    """Recria o elenco (finanças, fãs, força e títulos) com os valores
+    iniciais padrão e sobrescreve o `equipes.json`. Não afeta um jogo salvo
+    em andamento, que mantém sua própria cópia dos times.
+    """
     equipes = {campeonato: [Equipe(nome) for nome in nomes] for campeonato, nomes in EQUIPES_PADRAO.items()}
     salvar_equipes(equipes)
     return equipes

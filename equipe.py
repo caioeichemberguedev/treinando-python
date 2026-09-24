@@ -9,6 +9,7 @@ class Equipe:
 
     FINANCAS_INICIAL = 10_000_000
     FAS_INICIAL = 100_000
+    FORCA_INICIAL = 50
 
     PREMIO_VITORIA = 500_000
     FAS_POR_VITORIA = 5_000
@@ -17,11 +18,12 @@ class Equipe:
     PREMIO_TITULO = 5_000_000
     FAS_POR_TITULO = 50_000
 
-    def __init__(self, nome, financas=None, fas=None, titulos=0):
+    def __init__(self, nome, financas=None, fas=None, titulos=0, forca=None):
         self.nome = nome
         self.financas = financas if financas is not None else self.FINANCAS_INICIAL
         self.fas = fas if fas is not None else self.FAS_INICIAL
         self.titulos = titulos
+        self.forca = forca if forca is not None else self.FORCA_INICIAL
 
     def registrar_vitoria(self):
         self.financas += self.PREMIO_VITORIA
@@ -41,19 +43,29 @@ class Equipe:
             "financas": self.financas,
             "fas": self.fas,
             "titulos": self.titulos,
+            "forca": self.forca,
         }
 
     @classmethod
     def from_dict(cls, dados):
         if isinstance(dados, str):
             return cls(dados)
-        return cls(dados["nome"], dados.get("financas"), dados.get("fas"), dados.get("titulos", 0))
+        return cls(
+            dados["nome"],
+            dados.get("financas"),
+            dados.get("fas"),
+            dados.get("titulos", 0),
+            dados.get("forca"),
+        )
 
     def __str__(self):
         return self.nome
 
     def __repr__(self):
-        return f"Equipe({self.nome!r}, financas={self.financas}, fas={self.fas}, titulos={self.titulos})"
+        return (
+            f"Equipe({self.nome!r}, financas={self.financas}, fas={self.fas}, "
+            f"titulos={self.titulos}, forca={self.forca})"
+        )
 
     def __format__(self, format_spec):
         return format(self.nome, format_spec)
