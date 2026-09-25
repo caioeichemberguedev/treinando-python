@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pênaltis — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Disputa de pênaltis</h1>
+    <p>{{ campeonato }} — Temporada {{ temporada }}</p>
+    <p>{{ time_escolhido }} x {{ adversario }}</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Gols</th>
+                <th>Cobranças</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ time_escolhido }}</td>
+                <td>{{ gols_jogador }}</td>
+                <td>{{ sequencia_jogador|join(" ") }}</td>
+            </tr>
+            <tr>
+                <td>{{ adversario }}</td>
+                <td>{{ gols_adversario }}</td>
+                <td>{{ sequencia_adversario|join(" ") }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('cobrar_penalti') }}">
+        {% if vez_do_jogador_chutar %}
+            <p>Escolha o canto do seu chute:</p>
+        {% else %}
+            <p>Para qual canto seu goleiro vai pular?</p>
+        {% endif %}
+        <ul class="lista-escolha">
+        {% for numero, nome_canto in cantos.items() %}
+            <li>
+                <label>
+                    <input type="radio" name="canto" value="{{ numero }}" required>
+                    {{ nome_canto }}
+                </label>
+            </li>
+        {% endfor %}
+            <li>
+                <label>
+                    <input type="radio" name="canto" value="">
+                    Aleatório
+                </label>
+            </li>
+        </ul>
+        <button type="submit" class="botao">Cobrar</button>
+    </form>
+{% endblock %}

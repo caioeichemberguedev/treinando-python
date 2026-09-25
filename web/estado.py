@@ -17,11 +17,19 @@ class EstadoJogo:
     ordem de classificados no chaveamento e fases já jogadas na temporada.
 
     `fase_atual` guarda a fase que está sendo exibida em `GET /fase` (nome,
-    confrontos já resolvidos e os classificados que avançam dela), pra não
+    confrontos já resolvidos, o confronto pendente do jogador — se ainda não
+    decidido — e os classificados que avançam dela), pra não
     recalcular/resortear os confrontos a cada requisição — só é recalculada
     quando `None` (fase nova) e é limpa quando o jogador avança pra próxima
     fase (`POST /fase/avancar`). `campeao` só é preenchido quando a
     temporada termina.
+
+    `disputa_penaltis` guarda, entre requisições, o estado (formato de
+    `penaltis.criar_disputa`) da disputa de pênaltis em andamento do
+    confronto pendente do jogador — o mesmo papel que a variável local
+    `estado` tinha dentro de `disputa_penaltis()` no terminal, só que
+    persistido aqui porque cada cobrança é uma requisição HTTP separada.
+    `None` quando não há disputa em andamento.
     """
 
     campeonato: str
@@ -30,6 +38,7 @@ class EstadoJogo:
     classificados: list[Equipe]
     fases_da_temporada: list = field(default_factory=list)
     fase_atual: dict | None = None
+    disputa_penaltis: dict | None = None
     campeao: Equipe | None = None
 
 
