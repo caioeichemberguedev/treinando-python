@@ -55,3 +55,21 @@ footer {
 .botao:hover {
     background-color: var(--cor-destaque);
 }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--espacamento) 0;
+}
+
+th, td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--cor-borda);
+    text-align: left;
+}
+
+.destaque {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--cor-destaque);
+}

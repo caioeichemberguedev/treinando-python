@@ -15,6 +15,13 @@ from equipe import Equipe
 class EstadoJogo:
     """Um jogo em andamento: campeonato, time escolhido, temporada atual,
     ordem de classificados no chaveamento e fases já jogadas na temporada.
+
+    `fase_atual` guarda a fase que está sendo exibida em `GET /fase` (nome,
+    confrontos já resolvidos e os classificados que avançam dela), pra não
+    recalcular/resortear os confrontos a cada requisição — só é recalculada
+    quando `None` (fase nova) e é limpa quando o jogador avança pra próxima
+    fase (`POST /fase/avancar`). `campeao` só é preenchido quando a
+    temporada termina.
     """
 
     campeonato: str
@@ -22,6 +29,8 @@ class EstadoJogo:
     temporada: int
     classificados: list[Equipe]
     fases_da_temporada: list = field(default_factory=list)
+    fase_atual: dict | None = None
+    campeao: Equipe | None = None
 
 
 _jogo_atual: EstadoJogo | None = None

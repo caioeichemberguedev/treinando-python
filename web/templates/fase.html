@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ nome_fase }} — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>{{ nome_fase }}</h1>
+    <p>{{ campeonato }} — Temporada {{ temporada }}</p>
+    <p>Seu time: <strong>{{ time_escolhido }}</strong></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Mandante</th>
+                <th>Placar</th>
+                <th>Visitante</th>
+                <th>Vencedor</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for time_a, time_b, vencedor, gols_a, gols_b in confrontos %}
+            <tr>
+                <td>{{ time_a }}</td>
+                <td>{{ gols_a }} x {{ gols_b }}</td>
+                <td>{{ time_b }}</td>
+                <td>{{ vencedor }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('avancar_fase') }}">
+        <button type="submit" class="botao">Avançar fase</button>
+    </form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block titulo %}Campeão — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>🏆 Campeão da {{ campeonato }} {{ temporada }}</h1>
+    <p class="destaque">{{ campeao }}</p>
+
+    {% if jogador_foi_campeao %}
+        <p>🎉 PARABÉNS! Você foi campeão!</p>
+    {% else %}
+        <p>😢 Você não foi campeão.</p>
+    {% endif %}
+
+    <a class="botao" href="{{ url_for('inicio') }}">Voltar ao início</a>
+{% endblock %}
