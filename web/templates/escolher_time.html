@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block titulo %}Escolha seu time — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>{{ campeonato }}</h1>
+    <p>Escolha seu time:</p>
+    <form method="post" action="{{ url_for('escolher_time') }}">
+        <input type="hidden" name="campeonato" value="{{ campeonato }}">
+        <ul class="lista-escolha">
+        {% for time in times %}
+            <li>
+                <label>
+                    <input type="radio" name="time" value="{{ time.nome }}" required>
+                    {{ time.nome }}
+                    (💰 R$ {{ "{:,}".format(time.financas) }} | 👥 {{ "{:,}".format(time.fas) }} fãs |
+                    ⚡ {{ time.forca }}/100 | 🏆 {{ time.titulos }})
+                </label>
+            </li>
+        {% endfor %}
+        </ul>
+        <button type="submit" class="botao">Começar carreira</button>
+    </form>
+{% endblock %}

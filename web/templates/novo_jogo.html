@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block titulo %}Novo jogo — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Novo jogo</h1>
+    <p>Escolha o campeonato:</p>
+    <form method="post" action="{{ url_for('escolher_campeonato') }}">
+        <ul class="lista-escolha">
+        {% for campeonato in campeonatos %}
+            <li>
+                <label>
+                    <input type="radio" name="campeonato" value="{{ campeonato }}" required>
+                    {{ campeonato }}
+                </label>
+            </li>
+        {% endfor %}
+        </ul>
+        <button type="submit" class="botao">Continuar</button>
+    </form>
+{% endblock %}

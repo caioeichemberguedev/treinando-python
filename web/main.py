@@ -7,14 +7,15 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+
+from web.rotas import jogo
+from web.templates_config import templates
 
 BASE = Path(__file__).parent
 
 app = FastAPI(title="Jogo de Futebol")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
-
-templates = Jinja2Templates(directory=BASE / "templates")
+app.include_router(jogo.router)
 
 
 @app.get("/")

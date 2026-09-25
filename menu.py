@@ -1,9 +1,8 @@
 import os
-import random
 
 from cores import COR_TXT
 from equipe import Equipe
-from campeonato import gerar_rodadas, exibir_rodada, montar_classificacao
+from campeonato import gerar_rodadas, exibir_rodada, montar_classificacao, sortear_classificados
 from persistencia import (
     carregar_equipes,
     salvar_equipes,
@@ -154,8 +153,7 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
         if len(times) < 2:
             print(COR_TXT.ERRO, "Esse campeonato não tem equipes suficientes para a nova temporada.", COR_TXT.NORMAL)
             return
-        classificados = list(times)
-        random.shuffle(classificados)
+        classificados = sortear_classificados(times)
         salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico)
 
     os.system('cls')
@@ -215,8 +213,7 @@ def novo_jogo(equipes):
 
     time_escolhido = escolher_time(times)
     temporada = 2026
-    classificados = list(times)
-    random.shuffle(classificados)
+    classificados = sortear_classificados(times)
     nome_save = gerar_nome_save()
     salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados)
     print(COR_TXT.SUCESSO, f"Nova carreira criada: {nome_save}", COR_TXT.NORMAL)

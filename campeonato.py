@@ -1,3 +1,5 @@
+import random
+
 from penaltis import disputa_penaltis
 
 NOMES_FASE = {
@@ -12,6 +14,15 @@ NOMES_FASE = {
 
 def nome_da_fase(num_confrontos):
     return NOMES_FASE.get(num_confrontos, f"Rodada de {num_confrontos * 2}")
+
+
+def sortear_classificados(times):
+    """Embaralha `times` pra definir a ordem inicial do chaveamento de uma
+    temporada nova. Não altera a lista recebida — retorna uma cópia.
+    """
+    classificados = list(times)
+    random.shuffle(classificados)
+    return classificados
 
 
 def gerar_rodadas(classificados, time_escolhido=None, campeonato=""):
@@ -80,6 +91,79 @@ def exibir_rodada(nome_fase, confrontos):
 
     for time_a, time_b, vencedor, gols_a, gols_b in confrontos:
         print(f"{time_a:<{largura_a}} {gols_a} x {gols_b} {time_b:<{largura_b}} -> {vencedor}")
+
+
+def _separar_bye(classificados):
+    """Remove e retorna o último time de `classificados` quando o total for
+    ímpar (ele avança direto para a próxima fase, sem jogar); se o total for
+    par, não mexe na lista e retorna `None`.
+
+    Lógica duplicada de propósito a partir do trecho equivalente dentro de
+    `gerar_rodadas` (decisão do Caio: os dois caminhos ficam 100%
+    independentes nesta fatia, sem risco de alterar o comportamento do
+    terminal).
+    """
+    if len(classificados) % 2 != 0:
+        avanca_direto = classificados[-1]
+        del classificados[-1]
+        return avanca_direto
+    return None
+
+
+def montar_confrontos_fase(classificados, time_escolhido=None, campeonato=""):
+    """Monta os confrontos de UMA fase a partir de `classificados` e resolve
+    automaticamente (pênaltis não interativos) todo confronto que não
+    envolve `time_escolhido`.
+
+    Diferente de `gerar_rodadas` (generator que percorre a temporada inteira
+    e decide o confronto do jogador de forma interativa), esta função cuida
+    só da fase atual e deixa o confronto do jogador em aberto — pensada para
+    o fluxo web, em que esse confronto é resolvido aos poucos, entre
+    requisições HTTP.
+
+    Retorna (nome_fase, confrontos_resolvidos, confronto_pendente,
+    proximos_parciais):
+    - `confrontos_resolvidos`: lista de tuplas (time_a, time_b, vencedor,
+      gols_a, gols_b) — mesmo formato usado por `gerar_rodadas` — para cada
+      par que não envolve `time_escolhido`.
+    - `confronto_pendente`: tupla (time_a, time_b) do par que envolve
+      `time_escolhido`, ainda sem vencedor decidido; `None` se essa fase não
+      tiver o time do jogador.
+    - `proximos_parciais`: times que já se sabe que avançam (vencedores dos
+      confrontos resolvidos, mais o "bye" quando houver) — falta somar o
+      vencedor de `confronto_pendente`, quando ele existir, para fechar a
+      próxima fase.
+    """
+    classificados = list(classificados)
+    avanca_direto = _separar_bye(classificados)
+
+    nome_fase = nome_da_fase(len(classificados) // 2)
+    if campeonato:
+        nome_fase = f"{nome_fase} - {campeonato}"
+
+    confrontos_resolvidos = []
+    confronto_pendente = None
+    proximos_parciais = []
+
+    for i in range(0, len(classificados), 2):
+        time_a, time_b = classificados[i], classificados[i + 1]
+
+        if time_escolhido in (time_a, time_b):
+            confronto_pendente = (time_a, time_b)
+            continue
+
+        vencedor, gols_a, gols_b = disputa_penaltis(time_a, time_b, interativo=False)
+        perdedor = time_b if vencedor == time_a else time_a
+        vencedor.registrar_vitoria()
+        perdedor.registrar_eliminacao()
+
+        confrontos_resolvidos.append((time_a, time_b, vencedor, gols_a, gols_b))
+        proximos_parciais.append(vencedor)
+
+    if avanca_direto is not None:
+        proximos_parciais.append(avanca_direto)
+
+    return nome_fase, confrontos_resolvidos, confronto_pendente, proximos_parciais
 
 
 def montar_classificacao(fases):
