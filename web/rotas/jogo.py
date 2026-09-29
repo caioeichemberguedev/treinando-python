@@ -54,7 +54,7 @@ def escolher_time(campeonato: Annotated[str, Form()], time: Annotated[str, Form(
         raise HTTPException(status_code=404, detail="Time não encontrado nesse campeonato.")
 
     classificados = sortear_classificados(times)
-    iniciar_jogo(campeonato, time_escolhido, 2026, classificados)
+    iniciar_jogo(campeonato, time_escolhido, 2026, classificados, times_do_campeonato=times)
 
     return RedirectResponse(url="/fase", status_code=303)
 
@@ -271,6 +271,9 @@ def avancar_fase():
         campeao = proximos[0]
         campeao.sagrar_campea()
         jogo.campeao = campeao
+        jogo.historico.append(
+            {"temporada": jogo.temporada, "campeao": campeao, "fases": jogo.fases_da_temporada}
+        )
         return RedirectResponse(url="/campeao", status_code=303)
 
     return RedirectResponse(url="/fase", status_code=303)
@@ -293,3 +296,28 @@ def tela_campeao(request: Request):
             "jogador_foi_campeao": jogo.time_escolhido == jogo.campeao,
         },
     )
+
+
+@router.post("/campeao/continuar")
+def continuar_para_proxima_temporada():
+    """Segue direto para a próxima temporada da mesma carreira, sem passar
+    pelo terminal: sorteia uma nova ordem de classificados a partir do
+    roster completo do campeonato (`jogo.times_do_campeonato` — os mesmos
+    objetos `Equipe` mutados ao longo da temporada anterior, não um elenco
+    novo recarregado do arquivo), incrementa a temporada e zera a
+    fase/campeão atuais — espelha o que `menu_pos_temporada` faz quando o
+    jogador escolhe "Seguir para a próxima temporada" no terminal.
+    """
+    jogo = obter_jogo()
+    if jogo is None or jogo.campeao is None:
+        raise HTTPException(status_code=404, detail="Nenhum campeão definido ainda.")
+
+    times = jogo.times_do_campeonato
+
+    jogo.temporada += 1
+    jogo.classificados = sortear_classificados(times)
+    jogo.fases_da_temporada = []
+    jogo.fase_atual = None
+    jogo.campeao = None
+
+    return RedirectResponse(url="/fase", status_code=303)

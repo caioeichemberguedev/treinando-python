@@ -35,6 +35,18 @@ class EstadoJogo:
     formato usado por `persistencia`/`menu.py`: uma lista de dicts
     `{"temporada", "campeao", "fases"}`. Vazio num jogo novo; copiado do save
     quando uma carreira existente é carregada.
+
+    `times_do_campeonato` guarda o roster completo do campeonato capturado no
+    início da carreira — os MESMOS objetos `Equipe` (por identidade) usados em
+    `classificados`, não cópias novas. É reaproveitado em `POST
+    /campeao/continuar` pra sortear a próxima temporada sem perder a
+    progressão (finanças/fãs/títulos) acumulada durante a carreira: recarregar
+    o elenco do zero via `persistencia.carregar_equipes()` criaria objetos
+    `Equipe` novos, com os valores base do arquivo, jogando fora tudo que foi
+    ganho jogando. Vazio quando não informado (ex.: carreiras carregadas de um
+    save cujo `classificados` já veio como objetos `Equipe` reconstruídos à
+    parte — mesmo split de identidade que já existe hoje entre
+    `dados["classificados"]` e `equipes[campeonato]` em `menu.carregar_jogo`).
     """
 
     campeonato: str
@@ -46,6 +58,7 @@ class EstadoJogo:
     disputa_penaltis: dict | None = None
     campeao: Equipe | None = None
     historico: list = field(default_factory=list)
+    times_do_campeonato: list[Equipe] = field(default_factory=list)
 
 
 _jogo_atual: EstadoJogo | None = None
@@ -57,12 +70,14 @@ def iniciar_jogo(
     temporada: int,
     classificados: list[Equipe],
     historico: list | None = None,
+    times_do_campeonato: list[Equipe] | None = None,
 ) -> EstadoJogo:
     """Cria um novo jogo em andamento, substituindo o anterior (se houver).
 
-    `historico` é copiado (nunca guardado por referência), pra que alterações
-    posteriores em `jogo.historico` não afetem a lista original passada pelo
-    chamador (ex.: os dados brutos lidos de um save).
+    `historico` e `times_do_campeonato` são copiados (nunca guardados por
+    referência) — a lista em si nunca é a mesma recebida pelo chamador,
+    embora os objetos `Equipe` dentro de `times_do_campeonato` continuem
+    sendo os mesmos (por identidade) que os de `classificados`, de propósito.
     """
     global _jogo_atual
     _jogo_atual = EstadoJogo(
@@ -71,6 +86,7 @@ def iniciar_jogo(
         temporada=temporada,
         classificados=classificados,
         historico=list(historico) if historico is not None else [],
+        times_do_campeonato=list(times_do_campeonato) if times_do_campeonato is not None else [],
     )
     return _jogo_atual
 

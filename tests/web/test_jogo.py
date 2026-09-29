@@ -282,3 +282,80 @@ def test_fluxo_completo_ate_o_campeao_com_quatro_times():
     jogo = estado.obter_jogo()
     assert jogo.campeao in times_esperados
     assert rodadas == 2
+
+
+def test_campeao_acumula_a_temporada_concluida_no_historico():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    jogo = estado.obter_jogo()
+    assert len(jogo.historico) == 1
+    assert jogo.historico[0]["temporada"] == 2026
+    assert jogo.historico[0]["campeao"] == jogo.campeao
+
+
+def test_continuar_para_proxima_temporada_sem_campeao_definido_retorna_404():
+    resposta = client.post("/campeao/continuar")
+
+    assert resposta.status_code == 404
+
+
+def test_continuar_para_proxima_temporada_reinicia_o_ciclo():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    resposta = client.post("/campeao/continuar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/fase"
+
+    jogo = estado.obter_jogo()
+    assert jogo.temporada == 2027
+    assert jogo.campeao is None
+    assert jogo.fase_atual is None
+    assert jogo.fases_da_temporada == []
+    assert {str(time) for time in jogo.classificados} == {"Time A", "Time B"}
+
+    # A nova temporada segue o fluxo normal (inclusive pênaltis do jogador de novo).
+    resposta_fase = _passar_pela_fase_atual()
+    assert resposta_fase.status_code == 200
+
+
+def test_continuar_para_proxima_temporada_preserva_a_progressao_das_equipes():
+    """Finanças/fãs/títulos ganhos durante a temporada não podem se perder ao
+    continuar pra próxima: o roster completo do campeonato
+    (`jogo.times_do_campeonato`) precisa ser reaproveitado por identidade, e
+    não recarregado do zero a partir de `equipes.json`.
+    """
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    jogo = estado.obter_jogo()
+    campeao = jogo.campeao
+    financas_apos_titulo = campeao.financas
+    assert financas_apos_titulo > 1_000_000  # prêmio de vitória + prêmio de título, somados ao valor inicial
+
+    client.post("/campeao/continuar")
+
+    jogo = estado.obter_jogo()
+    equipe_na_nova_temporada = next(time for time in jogo.classificados if time == campeao)
+    assert equipe_na_nova_temporada is campeao  # mesmo objeto, progressão preservada
+    assert equipe_na_nova_temporada.financas == financas_apos_titulo
+
+
+def test_completar_duas_temporadas_acumula_dois_itens_no_historico():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+    client.post("/campeao/continuar")
+
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    jogo = estado.obter_jogo()
+    assert len(jogo.historico) == 2
+    assert jogo.historico[0]["temporada"] == 2026
+    assert jogo.historico[1]["temporada"] == 2027
