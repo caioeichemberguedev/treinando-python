@@ -30,6 +30,11 @@ class EstadoJogo:
     `estado` tinha dentro de `disputa_penaltis()` no terminal, só que
     persistido aqui porque cada cobrança é uma requisição HTTP separada.
     `None` quando não há disputa em andamento.
+
+    `historico` guarda as temporadas já concluídas desta carreira, no mesmo
+    formato usado por `persistencia`/`menu.py`: uma lista de dicts
+    `{"temporada", "campeao", "fases"}`. Vazio num jogo novo; copiado do save
+    quando uma carreira existente é carregada.
     """
 
     campeonato: str
@@ -40,19 +45,32 @@ class EstadoJogo:
     fase_atual: dict | None = None
     disputa_penaltis: dict | None = None
     campeao: Equipe | None = None
+    historico: list = field(default_factory=list)
 
 
 _jogo_atual: EstadoJogo | None = None
 
 
-def iniciar_jogo(campeonato: str, time_escolhido: Equipe, temporada: int, classificados: list[Equipe]) -> EstadoJogo:
-    """Cria um novo jogo em andamento, substituindo o anterior (se houver)."""
+def iniciar_jogo(
+    campeonato: str,
+    time_escolhido: Equipe,
+    temporada: int,
+    classificados: list[Equipe],
+    historico: list | None = None,
+) -> EstadoJogo:
+    """Cria um novo jogo em andamento, substituindo o anterior (se houver).
+
+    `historico` é copiado (nunca guardado por referência), pra que alterações
+    posteriores em `jogo.historico` não afetem a lista original passada pelo
+    chamador (ex.: os dados brutos lidos de um save).
+    """
     global _jogo_atual
     _jogo_atual = EstadoJogo(
         campeonato=campeonato,
         time_escolhido=time_escolhido,
         temporada=temporada,
         classificados=classificados,
+        historico=list(historico) if historico is not None else [],
     )
     return _jogo_atual
 
