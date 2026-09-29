@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block titulo %}Carreiras salvas — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Carreiras salvas</h1>
+
+    {% if not saves %}
+        <p>Nenhuma carreira salva encontrada.</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Carreira</th>
+                    <th>Time</th>
+                    <th>Campeonato</th>
+                    <th>Temporada</th>
+                    <th>Continuar</th>
+                    <th>Excluir</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for save in saves %}
+                <tr>
+                    <td>{{ save.nome }}</td>
+                    <td>{{ save.time_escolhido }}</td>
+                    <td>{{ save.campeonato }}</td>
+                    <td>{{ save.temporada }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('carregar_save', nome_save=save.nome) }}">
+                            <button type="submit" class="botao">Continuar</button>
+                        </form>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('confirmar_exclusao_save', nome_save=save.nome) }}" class="botao">Excluir</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <p><a href="{{ url_for('inicio') }}">Voltar ao início</a></p>
+{% endblock %}
