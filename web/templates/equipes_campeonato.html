@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titulo %}Equipes: {{ campeonato }} — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Equipes: {{ campeonato }}</h1>
+
+    {% if erro %}
+        <p><strong>{{ erro }}</strong></p>
+    {% endif %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Finanças</th>
+                <th>Fãs</th>
+                <th>Força</th>
+                <th>Títulos</th>
+                <th>Renomear</th>
+                <th>Remover</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for time in times %}
+            <tr>
+                <td>{{ time.nome }}</td>
+                <td>R$ {{ "{:,}".format(time.financas) }}</td>
+                <td>{{ "{:,}".format(time.fas) }}</td>
+                <td>{{ time.forca }}/100</td>
+                <td>{{ time.titulos }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('renomear_equipe', campeonato=campeonato, nome_equipe=time.nome) }}">
+                        <input type="text" name="nome_novo" value="{{ time.nome }}" required>
+                        <button type="submit" class="botao">Renomear</button>
+                    </form>
+                </td>
+                <td>
+                    <a href="{{ url_for('confirmar_remocao_equipe', campeonato=campeonato, nome_equipe=time.nome) }}" class="botao">Remover</a>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Adicionar equipe</h2>
+    <form method="post" action="{{ url_for('adicionar_equipe', campeonato=campeonato) }}">
+        <label>
+            Nome da nova equipe:
+            <input type="text" name="nome" required>
+        </label>
+        <button type="submit" class="botao">Adicionar</button>
+    </form>
+
+    <p><a href="{{ url_for('tela_equipes') }}">Voltar aos campeonatos</a></p>
+{% endblock %}

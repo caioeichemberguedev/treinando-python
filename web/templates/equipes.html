@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block titulo %}Editar equipes — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Editar equipes</h1>
+    <p>Escolha o campeonato:</p>
+    <ul class="lista-escolha">
+    {% for campeonato in campeonatos %}
+        <li><a href="{{ url_for('tela_equipes_campeonato', campeonato=campeonato) }}">{{ campeonato }}</a></li>
+    {% endfor %}
+    </ul>
+{% endblock %}

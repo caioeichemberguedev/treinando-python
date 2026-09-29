@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
-from web.rotas import jogo
+from web.rotas import equipes, jogo
 from web.templates_config import templates
 
 BASE = Path(__file__).parent
@@ -16,6 +16,7 @@ BASE = Path(__file__).parent
 app = FastAPI(title="Jogo de Futebol")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 app.include_router(jogo.router)
+app.include_router(equipes.router)
 
 
 @app.get("/")
