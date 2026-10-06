@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block titulo %}Restaurar equipes padrão — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Restaurar equipes para os valores padrão</h1>
+    <p>
+        Tem certeza? Isso vai apagar todas as edições de elenco, finanças, fãs
+        e força feitas até agora (as carreiras salvas e o jogo em andamento não
+        são afetados). Essa ação não pode ser desfeita.
+    </p>
+    <form method="post" action="{{ url_for('restaurar_equipes') }}">
+        <button type="submit" class="botao">Confirmar restauração</button>
+    </form>
+    <p><a href="{{ url_for('tela_equipes') }}">Cancelar</a></p>
+{% endblock %}

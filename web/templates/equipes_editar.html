@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block titulo %}Editar {{ equipe.nome }} — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Editar {{ equipe.nome }}</h1>
+
+    {% if edicao_bloqueada %}
+        <p><strong>{{ mensagem_bloqueio }}</strong></p>
+    {% else %}
+        {% if erros %}
+            <ul>
+            {% for erro in erros %}
+                <li><strong>{{ erro }}</strong></li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post" action="{{ url_for('editar_equipe', campeonato=campeonato, nome_equipe=equipe.nome) }}">
+            <p>
+                <label>
+                    Finanças (R$):
+                    <input type="number" name="financas" min="0" step="1" value="{{ equipe.financas }}" required>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Fãs:
+                    <input type="number" name="fas" min="0" step="1" value="{{ equipe.fas }}" required>
+                </label>
+            </p>
+            <p>
+                <label>
+                    Força (0 a 100):
+                    <input type="number" name="forca" min="0" max="100" step="1" value="{{ equipe.forca }}" required>
+                </label>
+            </p>
+            <button type="submit" class="botao">Salvar</button>
+        </form>
+    {% endif %}
+
+    <p><a href="{{ url_for('tela_equipes_campeonato', campeonato=campeonato) }}">Voltar às equipes de {{ campeonato }}</a></p>
+{% endblock %}

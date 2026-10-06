@@ -10,4 +10,6 @@
         <li><a href="{{ url_for('tela_equipes_campeonato', campeonato=campeonato) }}">{{ campeonato }}</a></li>
     {% endfor %}
     </ul>
+
+    <p><a href="{{ url_for('confirmar_restauracao_equipes') }}" class="botao">Restaurar equipes para os valores padrão</a></p>
 {% endblock %}
