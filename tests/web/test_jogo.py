@@ -1,5 +1,6 @@
 import json
 import random
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -165,6 +166,181 @@ def test_penaltis_sem_disputa_em_andamento_retorna_404():
     assert resposta.status_code == 404
 
 
+def _iniciar_disputa_de_teste():
+    """Começa um jogo com 2 times e abre a disputa de pênaltis do jogador.
+    Retorna o estado da disputa (`jogo.disputa_penaltis["estado"]`).
+    """
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.get("/fase/penaltis")
+    return estado.obter_jogo().disputa_penaltis["estado"]
+
+
+def _placar_da_disputa(estado_disputa):
+    return (
+        estado_disputa["gols_a"],
+        estado_disputa["gols_b"],
+        list(estado_disputa["sequencia_a"]),
+        list(estado_disputa["sequencia_b"]),
+    )
+
+
+def test_penaltis_sem_escolha_volta_com_aleatorio_marcado_sem_cobrar():
+    estado_disputa = _iniciar_disputa_de_teste()
+    antes = _placar_da_disputa(estado_disputa)
+
+    resposta = client.post("/fase/penaltis", data={}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/fase/penaltis?aleatorio=1"
+    assert _placar_da_disputa(estado_disputa) == antes
+
+
+def test_tela_penaltis_com_param_aleatorio_marca_a_opcao():
+    _iniciar_disputa_de_teste()
+
+    com_param = client.get("/fase/penaltis?aleatorio=1")
+    sem_param = client.get("/fase/penaltis")
+
+    assert com_param.status_code == 200
+    assert _radios_marcados(com_param.text) == ["aleatorio"]
+    assert sem_param.status_code == 200
+    assert _radios_marcados(sem_param.text) == []
+
+
+def _radios_de_canto(html):
+    """Lista as tags `<input type="radio" name="canto" ...>` do HTML."""
+    return re.findall(r'<input\b[^>]*type="radio"[^>]*name="canto"[^>]*>', html)
+
+
+def _radios_marcados(html):
+    """Valores dos radios de canto que vêm com o atributo `checked`."""
+    marcados = []
+    for tag in _radios_de_canto(html):
+        if re.search(r"\schecked\b", tag):
+            marcados.append(re.search(r'value="([^"]*)"', tag).group(1))
+    return marcados
+
+
+def test_tela_penaltis_lista_os_quatro_radios_de_canto():
+    _iniciar_disputa_de_teste()
+
+    resposta = client.get("/fase/penaltis")
+
+    valores = [re.search(r'value="([^"]*)"', tag).group(1) for tag in _radios_de_canto(resposta.text)]
+    assert valores == ["1", "2", "3", "aleatorio"]
+
+
+def test_tela_penaltis_nao_tem_radios_obrigatorios():
+    _iniciar_disputa_de_teste()
+
+    resposta = client.get("/fase/penaltis")
+
+    radios = _radios_de_canto(resposta.text)
+    assert radios
+    assert all("required" not in tag for tag in radios)
+    assert "required" not in resposta.text
+
+
+def test_penaltis_canto_vazio_equivale_a_nao_escolher():
+    """`canto=""` é tratado igual ao campo ausente: volta com Aleatório marcado."""
+    estado_disputa = _iniciar_disputa_de_teste()
+
+    resposta = client.post("/fase/penaltis", data={"canto": ""}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/fase/penaltis?aleatorio=1"
+    assert estado_disputa["sequencia_a"] == []
+    assert estado_disputa["sequencia_b"] == []
+    assert estado_disputa["gols_a"] == 0
+    assert estado_disputa["gols_b"] == 0
+
+
+@pytest.mark.parametrize("canto", ["1", "2", "3"])
+def test_penaltis_canto_escolhido_e_usado_no_chute(monkeypatch, canto):
+    estado_disputa = _iniciar_disputa_de_teste()
+    monkeypatch.setattr(random, "randint", lambda a, b: int(canto))  # goleiro adivinha
+
+    resposta = client.post("/fase/penaltis", data={"canto": canto}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert estado_disputa["sequencia_a"] == ["🔴"]
+    assert estado_disputa["gols_a"] == 0
+
+
+def test_penaltis_aleatorio_na_vez_do_goleiro_aplica_cobranca_do_adversario(monkeypatch):
+    estado_disputa = _iniciar_disputa_de_teste()
+    client.post("/fase/penaltis", data={"canto": "1"})
+    assert len(estado_disputa["sequencia_a"]) == 1  # agora é a vez do goleiro
+    antes_a = list(estado_disputa["sequencia_a"])
+    valores = iter([2, 2])  # chute do adversário no 2, goleiro sorteado no 2 → defesa
+    monkeypatch.setattr(random, "randint", lambda a, b: next(valores))
+
+    resposta = client.post("/fase/penaltis", data={"canto": "aleatorio"}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert estado_disputa["sequencia_a"] == antes_a
+    assert estado_disputa["sequencia_b"] == ["🔴"]
+    assert estado_disputa["gols_b"] == 0
+
+
+def test_penaltis_sem_escolha_na_vez_do_goleiro_nao_aplica_cobranca():
+    estado_disputa = _iniciar_disputa_de_teste()
+    client.post("/fase/penaltis", data={"canto": "1"})
+    antes = _placar_da_disputa(estado_disputa)
+
+    resposta = client.post("/fase/penaltis", data={}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/fase/penaltis?aleatorio=1"
+    assert _placar_da_disputa(estado_disputa) == antes
+    tela = client.get("/fase/penaltis?aleatorio=1")
+    assert _radios_marcados(tela.text) == ["aleatorio"]
+    assert "Defender" in tela.text
+
+
+def test_penaltis_aleatorio_sorteia_e_aplica_uma_cobranca(monkeypatch):
+    estado_disputa = _iniciar_disputa_de_teste()
+    valores = iter([1, 2])  # chute no 1, goleiro pula no 2 → gol
+    monkeypatch.setattr(random, "randint", lambda a, b: next(valores))
+
+    resposta = client.post("/fase/penaltis", data={"canto": "aleatorio"}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/fase/penaltis"
+    assert len(estado_disputa["sequencia_a"]) == 1
+    assert len(estado_disputa["sequencia_b"]) == 0
+    assert estado_disputa["gols_a"] == 1
+
+
+@pytest.mark.parametrize("canto", ["4", "x"])
+def test_penaltis_canto_invalido_retorna_400(canto):
+    _iniciar_disputa_de_teste()
+
+    resposta = client.post("/fase/penaltis", data={"canto": canto})
+
+    assert resposta.status_code == 400
+
+
+def test_penaltis_sem_escolha_e_sem_disputa_retorna_404():
+    resposta = client.post("/fase/penaltis", data={}, follow_redirects=False)
+
+    assert resposta.status_code == 404
+
+
+def test_botao_da_tela_de_penaltis_conforme_a_vez():
+    estado_disputa = _iniciar_disputa_de_teste()
+
+    vez_do_chute = client.get("/fase/penaltis")
+    assert len(estado_disputa["sequencia_a"]) == len(estado_disputa["sequencia_b"])  # vez do jogador chutar
+    assert "Cobrar" in vez_do_chute.text
+    assert "Defender" not in vez_do_chute.text
+
+    client.post("/fase/penaltis", data={"canto": "1"})
+    vez_do_goleiro = client.get("/fase/penaltis")
+    assert len(estado_disputa["sequencia_a"]) > len(estado_disputa["sequencia_b"])  # vez do goleiro
+    assert "Defender" in vez_do_goleiro.text
+
+
 def test_avancar_fase_com_confronto_pendente_retorna_400():
     """Não dá pra avançar de fase com o confronto do jogador ainda em
     aberto — precisa passar pela disputa de pênaltis primeiro.
@@ -217,7 +393,7 @@ def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
 
     resposta = None
     for _ in range(6):
-        resposta = client.post("/fase/penaltis", data={"canto": ""}, follow_redirects=False)
+        resposta = client.post("/fase/penaltis", data={"canto": "aleatorio"}, follow_redirects=False)
         assert resposta.status_code == 303
         if resposta.headers["location"] == "/fase":
             break

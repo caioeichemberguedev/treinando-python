@@ -179,10 +179,13 @@ def _concluir_disputa_penaltis(jogo: EstadoJogo) -> None:
 
 
 @router.get("/fase/penaltis")
-def tela_penaltis(request: Request):
+def tela_penaltis(request: Request, aleatorio: bool = False):
     """Mostra o placar atual da disputa de pênaltis do confronto do jogador
     e pede a próxima decisão (canto do chute ou lado do goleiro), uma
     cobrança por vez.
+
+    `?aleatorio=1` só deixa a opção "Aleatório" já marcada no formulário
+    (usado depois de um clique sem escolha) — não altera estado nenhum.
     """
     jogo = obter_jogo()
     if jogo is None or jogo.fase_atual is None:
@@ -211,26 +214,38 @@ def tela_penaltis(request: Request):
             "sequencia_adversario": estado_disputa["sequencia_b"],
             "vez_do_jogador_chutar": _turno_atual(estado_disputa) == "a",
             "cantos": CANTOS,
+            "aleatorio_marcado": aleatorio,
         },
     )
 
 
 @router.post("/fase/penaltis")
-def cobrar_penalti(canto: Annotated[str, Form()] = ""):
+def cobrar_penalti(canto: Annotated[str | None, Form()] = None):
     """Aplica UMA cobrança da disputa de pênaltis em andamento (chute do
     jogador ou lado do goleiro dele, conforme a vez) e redireciona de volta
     pra `GET /fase/penaltis` — até a disputa terminar, quando o confronto é
     fechado e o redirecionamento volta pra `GET /fase`.
 
-    `canto` vazio sorteia (mesmo comportamento de "nulo" no terminal).
+    Valores de `canto`:
+    - ausente (nenhum radio marcado) ou vazio (`""`): não aplica cobrança;
+      volta pra tela com "Aleatório" já marcado (`?aleatorio=1`).
+    - `"aleatorio"`: sorteia (mesmo comportamento de "nulo" no terminal).
+    - `"1"`/`"2"`/`"3"`: canto escolhido.
+    - qualquer outro valor: 400.
     """
     jogo = obter_jogo()
     if jogo is None or jogo.fase_atual is None or jogo.disputa_penaltis is None:
         raise HTTPException(status_code=404, detail="Nenhuma disputa de pênaltis em andamento.")
 
-    if canto and canto not in {"1", "2", "3"}:
+    if canto is None:
+        return RedirectResponse(url="/fase/penaltis?aleatorio=1", status_code=303)
+
+    if canto == "aleatorio":
+        canto_escolhido = None
+    elif canto in {"1", "2", "3"}:
+        canto_escolhido = int(canto)
+    else:
         raise HTTPException(status_code=400, detail="Canto inválido.")
-    canto_escolhido = int(canto) if canto else None
 
     estado_disputa = jogo.disputa_penaltis["estado"]
     if _turno_atual(estado_disputa) == "a":

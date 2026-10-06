@@ -39,18 +39,18 @@
         {% for numero, nome_canto in cantos.items() %}
             <li>
                 <label>
-                    <input type="radio" name="canto" value="{{ numero }}" required>
+                    <input type="radio" name="canto" value="{{ numero }}">
                     {{ nome_canto }}
                 </label>
             </li>
         {% endfor %}
             <li>
                 <label>
-                    <input type="radio" name="canto" value="">
+                    <input type="radio" name="canto" value="aleatorio"{% if aleatorio_marcado %} checked{% endif %}>
                     Aleatório
                 </label>
             </li>
         </ul>
-        <button type="submit" class="botao">Cobrar</button>
+        <button type="submit" class="botao">{% if vez_do_jogador_chutar %}Cobrar{% else %}Defender{% endif %}</button>
     </form>
 {% endblock %}
