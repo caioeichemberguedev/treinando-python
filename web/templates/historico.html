@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block titulo %}Histórico — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Histórico de temporadas</h1>
+
+    {% if not historico %}
+        <p>Nenhuma temporada concluída ainda.</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Temporada</th>
+                    <th>Campeão</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for temporada_info in historico %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ temporada_info.temporada }}</td>
+                    <td>{{ temporada_info.campeao }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <p><a href="{{ url_for('inicio') }}">Voltar ao início</a></p>
+{% endblock %}
