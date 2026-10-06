@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block titulo %}Campeões — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Campeões</h1>
+
+    {% if not historico %}
+        <p>Nenhum campeão ainda.</p>
+    {% else %}
+        <h2>Campeões por temporada</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Temporada</th>
+                    <th>Campeão</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for temporada_info in historico %}
+                <tr>
+                    <td>{{ temporada_info.temporada }}</td>
+                    <td>{{ temporada_info.campeao }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>Títulos por time</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Títulos</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for time, titulos in titulos_por_time %}
+                <tr>
+                    <td>{{ time }}</td>
+                    <td>{{ titulos }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <p><a href="{{ url_for('tela_historico') }}">Voltar ao histórico</a></p>
+{% endblock %}
