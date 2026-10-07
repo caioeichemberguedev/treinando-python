@@ -6,6 +6,11 @@ class Equipe:
     "#E30613") ou None quando o time não tem cores cadastradas (ex.: save
     antigo); nesse caso a interface usa um escudo padrão.
 
+    `id` é um inteiro único e imutável que identifica o time (como a chave
+    primária de um banco de dados); o nome é só o que aparece na tela. É
+    somente leitura (`equipe.id = 5` levanta `AttributeError`) e fica None
+    quando o time não tem id cadastrado (ex.: save antigo, times de teste).
+
     Se comporta como uma string (__str__/__format__/__len__/__eq__/__hash__)
     para poder ser usada nos mesmos lugares que hoje esperam o nome do time
     (chaveamento, placar, comparações), sem precisar espalhar `.nome` por
@@ -24,14 +29,27 @@ class Equipe:
     FAS_POR_TITULO = 50_000
 
     def __init__(
-        self, nome, financas=None, fas=None, titulos=0, forca=None, cores=None
+        self,
+        nome,
+        financas=None,
+        fas=None,
+        titulos=0,
+        forca=None,
+        cores=None,
+        id=None,
     ):
+        self._id = id
         self.nome = nome
         self.financas = financas if financas is not None else self.FINANCAS_INICIAL
         self.fas = fas if fas is not None else self.FAS_INICIAL
         self.titulos = titulos
         self.forca = forca if forca is not None else self.FORCA_INICIAL
         self.cores = list(cores) if cores is not None else None
+
+    @property
+    def id(self):
+        """Identificador fixo do time (somente leitura, sem setter)."""
+        return self._id
 
     def registrar_vitoria(self):
         self.financas += self.PREMIO_VITORIA
@@ -47,6 +65,7 @@ class Equipe:
 
     def to_dict(self):
         return {
+            "id": self.id,
             "nome": self.nome,
             "financas": self.financas,
             "fas": self.fas,
@@ -66,6 +85,7 @@ class Equipe:
             dados.get("titulos", 0),
             dados.get("forca"),
             dados.get("cores"),
+            id=dados.get("id"),
         )
 
     def __str__(self):
@@ -73,7 +93,7 @@ class Equipe:
 
     def __repr__(self):
         return (
-            f"Equipe({self.nome!r}, financas={self.financas}, fas={self.fas}, "
+            f"Equipe({self.nome!r}, id={self.id!r}, financas={self.financas}, fas={self.fas}, "
             f"titulos={self.titulos}, forca={self.forca}, "
             f"cores={self.cores!r})"
         )

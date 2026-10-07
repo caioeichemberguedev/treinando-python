@@ -1,3 +1,5 @@
+import pytest
+
 from equipe import Equipe
 
 
@@ -82,3 +84,63 @@ def test_repr_inclui_cores():
     assert "cores=['#E30613', '#FFFFFF', '#000000']" in repr(
         Equipe("São Paulo", cores=CORES_SAO_PAULO)
     )
+
+
+def test_equipe_sem_id_tem_id_none():
+    assert Equipe("X").id is None
+
+
+def test_equipe_com_id_guarda_o_valor():
+    assert Equipe("X", id=7).id == 7
+
+
+def test_id_e_somente_leitura():
+    """`id` é uma propriedade sem setter: não pode ser trocado depois."""
+    equipe = Equipe("X", id=7)
+
+    with pytest.raises(AttributeError):
+        equipe.id = 8
+
+    assert equipe.id == 7
+
+
+def test_to_dict_sempre_tem_a_chave_id():
+    assert Equipe("X").to_dict()["id"] is None
+    assert Equipe("X", id=7).to_dict()["id"] == 7
+
+
+def test_ida_e_volta_com_id_preserva_id_e_demais_campos():
+    original = Equipe(
+        "São Paulo",
+        financas=1_234,
+        fas=5_678,
+        titulos=3,
+        forca=80,
+        cores=CORES_SAO_PAULO,
+        id=1,
+    )
+
+    copia = Equipe.from_dict(original.to_dict())
+
+    assert copia.id == 1
+    assert copia.to_dict() == original.to_dict()
+
+
+def test_from_dict_sem_id_fica_com_id_none():
+    """Dados antigos sem a chave `id` carregam sem erro, com id None."""
+    assert Equipe.from_dict({"nome": "X"}).id is None
+
+
+def test_from_dict_de_string_crua_fica_sem_id():
+    assert Equipe.from_dict("X").id is None
+
+
+def test_repr_inclui_id():
+    assert "id=7" in repr(Equipe("X", id=7))
+    assert "id=None" in repr(Equipe("X"))
+
+
+def test_id_nao_muda_a_comparacao_por_nome_ainda():
+    """Nesta etapa a igualdade continua pelo nome (a troca é na ID-007-T8)."""
+    assert Equipe("X", id=1) == Equipe("X", id=2)
+    assert Equipe("X", id=1) == "X"
