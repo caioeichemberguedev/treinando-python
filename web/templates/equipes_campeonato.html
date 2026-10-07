@@ -5,10 +5,6 @@
 {% block conteudo %}
     <h1>Equipes: {{ campeonato }}</h1>
 
-    {% if erro %}
-        <p><strong>{{ erro }}</strong></p>
-    {% endif %}
-
     {% if edicao_bloqueada %}
         <p>{{ mensagem_bloqueio }}</p>
     {% endif %}
@@ -24,8 +20,6 @@
                 {% if not edicao_bloqueada %}
                 <th>Finanças/fãs/força</th>
                 {% endif %}
-                <th>Renomear</th>
-                <th>Remover</th>
             </tr>
         </thead>
         <tbody>
@@ -41,28 +35,10 @@
                     <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, nome_equipe=time.nome) }}" class="botao">Editar</a>
                 </td>
                 {% endif %}
-                <td>
-                    <form method="post" action="{{ url_for('renomear_equipe', campeonato=campeonato, nome_equipe=time.nome) }}">
-                        <input type="text" name="nome_novo" value="{{ time.nome }}" required>
-                        <button type="submit" class="botao">Renomear</button>
-                    </form>
-                </td>
-                <td>
-                    <a href="{{ url_for('confirmar_remocao_equipe', campeonato=campeonato, nome_equipe=time.nome) }}" class="botao">Remover</a>
-                </td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
-
-    <h2>Adicionar equipe</h2>
-    <form method="post" action="{{ url_for('adicionar_equipe', campeonato=campeonato) }}">
-        <label>
-            Nome da nova equipe:
-            <input type="text" name="nome" required>
-        </label>
-        <button type="submit" class="botao">Adicionar</button>
-    </form>
 
     <p><a href="{{ url_for('tela_equipes') }}">Voltar aos campeonatos</a></p>
 {% endblock %}

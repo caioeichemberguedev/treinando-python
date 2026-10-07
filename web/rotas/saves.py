@@ -7,7 +7,7 @@ regravado em `saves/` enquanto se joga pela web (decisão do ID-001,
 reafirmada no ID-002: o "jogo em andamento" continua só em memória).
 Excluir uma carreira é uma ação destrutiva, então passa por uma tela de
 confirmação antes do POST que efetivamente remove, do mesmo jeito que
-`web/rotas/equipes.py` já faz para remover uma equipe.
+`web/rotas/equipes.py` já faz para restaurar o elenco padrão.
 """
 
 from fastapi import APIRouter, HTTPException, Request

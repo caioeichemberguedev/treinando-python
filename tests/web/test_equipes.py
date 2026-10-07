@@ -61,105 +61,35 @@ def test_tela_equipes_campeonato_inexistente_retorna_404():
     assert resposta.status_code == 404
 
 
-def test_adicionar_equipe_valida_aparece_na_lista_e_persiste(equipes_de_teste):
-    resposta = client.post(
-        "/equipes/Campeonato Teste/adicionar", data={"nome": "Time Novo"}, follow_redirects=False
-    )
-
-    assert resposta.status_code == 303
-    assert resposta.headers["location"].endswith("/equipes/Campeonato%20Teste")
-
-    resposta_lista = client.get("/equipes/Campeonato Teste")
-    assert "Time Novo" in resposta_lista.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert "Time Novo" in nomes
-
-
-def test_adicionar_equipe_com_nome_vazio_nao_altera_a_lista(equipes_de_teste):
-    resposta = client.post("/equipes/Campeonato Teste/adicionar", data={"nome": "   "})
-
-    assert resposta.status_code == 400
-    assert "Nome vazio" in resposta.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    assert len(dados["Campeonato Teste"]) == 2
-
-
-def test_adicionar_equipe_duplicada_nao_altera_a_lista_e_mostra_erro(equipes_de_teste):
-    resposta = client.post("/equipes/Campeonato Teste/adicionar", data={"nome": "Time A"})
-
-    assert resposta.status_code == 400
-    assert "já existe" in resposta.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    assert len(dados["Campeonato Teste"]) == 2
-
-
-def test_confirmar_remocao_mostra_tela_de_confirmacao_sem_remover(equipes_de_teste):
-    resposta = client.get("/equipes/Campeonato Teste/Time A/remover")
+@pytest.mark.parametrize("trecho", ["nome_novo", "/adicionar", "/remover", "/renomear", "Adicionar equipe"])
+def test_tela_equipes_campeonato_nao_oferece_adicionar_renomear_nem_remover(trecho):
+    resposta = client.get("/equipes/Campeonato Teste")
 
     assert resposta.status_code == 200
-    assert "certeza" in resposta.text.lower()
-    assert "Time A" in resposta.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert "Time A" in nomes
+    assert trecho not in resposta.text
 
 
-def test_remover_equipe_existente_reduz_a_lista_e_persiste(equipes_de_teste):
-    resposta = client.post("/equipes/Campeonato Teste/Time A/remover", follow_redirects=False)
+@pytest.mark.parametrize(
+    ("metodo", "caminho", "dados"),
+    [
+        ("post", "/equipes/Campeonato Teste/adicionar", {"nome": "X"}),
+        ("get", "/equipes/Campeonato Teste/Time A/remover", None),
+        ("post", "/equipes/Campeonato Teste/Time A/remover", None),
+        ("post", "/equipes/Campeonato Teste/Time A/renomear", {"nome_novo": "X"}),
+    ],
+)
+def test_rotas_de_adicionar_renomear_e_remover_nao_existem_e_nao_alteram_equipes(
+    equipes_de_teste, metodo, caminho, dados
+):
+    conteudo_antes = equipes_de_teste.read_bytes()
 
-    assert resposta.status_code == 303
+    if metodo == "post":
+        resposta = client.post(caminho, data=dados, follow_redirects=False)
+    else:
+        resposta = client.get(caminho, follow_redirects=False)
 
-    resposta_lista = client.get("/equipes/Campeonato Teste")
-    assert "Time A" not in resposta_lista.text
-    assert "Time B" in resposta_lista.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert nomes == ["Time B"]
-
-
-def test_remover_equipe_inexistente_retorna_404():
-    resposta = client.post("/equipes/Campeonato Teste/Time Fantasma/remover")
-
-    assert resposta.status_code == 404
-
-
-def test_renomear_equipe_muda_o_nome_e_persiste(equipes_de_teste):
-    resposta = client.post(
-        "/equipes/Campeonato Teste/Time A/renomear", data={"nome_novo": "Time Renomeado"}, follow_redirects=False
-    )
-
-    assert resposta.status_code == 303
-
-    resposta_lista = client.get("/equipes/Campeonato Teste")
-    assert "Time Renomeado" in resposta_lista.text
-    assert "Time A" not in resposta_lista.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert "Time Renomeado" in nomes
-
-
-def test_renomear_equipe_com_nome_vazio_nao_altera_a_lista(equipes_de_teste):
-    resposta = client.post("/equipes/Campeonato Teste/Time A/renomear", data={"nome_novo": "   "})
-
-    assert resposta.status_code == 400
-    assert "Nome vazio" in resposta.text
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert "Time A" in nomes
-
-
-def test_renomear_equipe_inexistente_retorna_404():
-    resposta = client.post("/equipes/Campeonato Teste/Time Fantasma/renomear", data={"nome_novo": "Qualquer"})
-
-    assert resposta.status_code == 404
+    assert resposta.status_code in (404, 405)
+    assert equipes_de_teste.read_bytes() == conteudo_antes
 
 
 def _criar_save_de_teste():
@@ -267,18 +197,6 @@ def test_editar_equipe_com_save_e_recusado_e_nao_persiste(equipes_de_teste):
     time_a = _equipe_salva(equipes_de_teste, "Campeonato Teste", "Time A")
     assert time_a["forca"] == 50
     assert time_a["financas"] == 1_000_000
-
-
-def test_com_save_adicionar_remover_e_renomear_continuam_liberados(equipes_de_teste):
-    _criar_save_de_teste()
-
-    client.post("/equipes/Campeonato Teste/adicionar", data={"nome": "Time Novo"})
-    client.post("/equipes/Campeonato Teste/Time B/remover")
-    client.post("/equipes/Campeonato Teste/Time A/renomear", data={"nome_novo": "Time Renomeado"})
-
-    dados = _ler_equipes_salvas(equipes_de_teste)
-    nomes = [time["nome"] for time in dados["Campeonato Teste"]]
-    assert nomes == ["Time Renomeado", "Time Novo"]
 
 
 def test_tela_equipes_tem_link_para_restaurar_padrao():
