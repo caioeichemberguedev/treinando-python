@@ -20,8 +20,8 @@ def equipes_e_saves_de_teste(tmp_path, monkeypatch):
     """
     dados = {
         "Campeonato Teste": [
-            {"nome": "Time A", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Time B", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 901, "nome": "Time A", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 902, "nome": "Time B", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
         ],
     }
     arquivo_equipes = tmp_path / "equipes.json"
@@ -36,9 +36,9 @@ def equipes_e_saves_de_teste(tmp_path, monkeypatch):
 def _criar_save(
     nome, campeonato="Campeonato Teste", time_escolhido=None, temporada=2026, classificados="padrao", historico=None
 ):
-    time_escolhido = time_escolhido or Equipe("Time A")
+    time_escolhido = time_escolhido or Equipe("Time A", id=901)
     if classificados == "padrao":
-        classificados = [Equipe("Time A"), Equipe("Time B")]
+        classificados = [Equipe("Time A", id=901), Equipe("Time B", id=902)]
     persistencia.salvar_jogo(nome, campeonato, time_escolhido, temporada, classificados, historico)
 
 
@@ -72,7 +72,8 @@ def test_carregar_save_valido_redireciona_e_preenche_o_estado():
     jogo = estado.obter_jogo()
     assert jogo is not None
     assert jogo.campeonato == "Campeonato Teste"
-    assert jogo.time_escolhido == "Time A"
+    assert jogo.time_escolhido.nome == "Time A"
+    assert jogo.time_escolhido.id == 901
     assert jogo.temporada == 2027
     assert {str(time) for time in jogo.classificados} == {"Time A", "Time B"}
     assert jogo.historico == []
@@ -104,7 +105,7 @@ def test_carregar_save_com_classificados_none_sorteia_a_partir_do_elenco_base():
 
 
 def test_carregar_save_copia_o_historico_para_o_estado():
-    historico = [{"temporada": 2026, "campeao": "Time A", "fases": []}]
+    historico = [{"temporada": 2026, "campeao": 901, "fases": []}]
     _criar_save("1_01_01_2026", temporada=2027, historico=historico)
 
     client.post("/saves/1_01_01_2026/carregar")
@@ -166,8 +167,8 @@ def test_tela_saves_mostra_um_escudo_por_carreira():
 
 def test_tela_saves_save_antigo_sem_cores_usa_cores_do_catalogo():
     """Save gravado antes do campo `cores` existir: o escudo do time
-    escolhido busca as cores pelo nome no catálogo do elenco padrão."""
-    _criar_save("1_01_01_2026", time_escolhido=Equipe("Brasil"))
+    escolhido busca as cores pelo id no catálogo do elenco padrão."""
+    _criar_save("1_01_01_2026", time_escolhido=Equipe("São Paulo", id=1))
     arquivo = os.path.join(persistencia.DIR_SAVES, "1_01_01_2026.json")
     with open(arquivo, encoding="utf-8") as f:
         dados = json.load(f)
@@ -179,4 +180,4 @@ def test_tela_saves_save_antigo_sem_cores_usa_cores_do_catalogo():
 
     assert resposta.status_code == 200
     assert resposta.text.count('class="escudo"') == 1
-    assert "#009C3B" in resposta.text
+    assert "#E30613" in resposta.text

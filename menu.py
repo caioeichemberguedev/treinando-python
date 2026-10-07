@@ -1,7 +1,14 @@
 import os
 
+from catalogo import nome_para_exibir
 from cores import COR_TXT
-from campeonato import gerar_rodadas, exibir_rodada, montar_classificacao, sortear_classificados
+from campeonato import (
+    gerar_rodadas,
+    exibir_rodada,
+    montar_classificacao,
+    registro_da_fase,
+    sortear_classificados,
+)
 from persistencia import (
     carregar_equipes,
     salvar_equipes,
@@ -49,6 +56,17 @@ def escolher_time(times):
     return times[escolha - 1]
 
 
+def _confrontos_com_nomes(confrontos):
+    """Troca os ids de cada confronto do histórico ([id_a, id_b,
+    id_vencedor, gols_a, gols_b]) pelos nomes para exibir, no formato de
+    tupla esperado por `exibir_rodada`.
+    """
+    return [
+        (nome_para_exibir(time_a), nome_para_exibir(time_b), nome_para_exibir(vencedor), gols_a, gols_b)
+        for time_a, time_b, vencedor, gols_a, gols_b in confrontos
+    ]
+
+
 def exibir_historico_jogos(historico):
     if not historico:
         print(COR_TXT.ATENCAO, "Nenhuma temporada concluída ainda.", COR_TXT.NORMAL)
@@ -56,11 +74,12 @@ def exibir_historico_jogos(historico):
 
     print("\nTemporadas disputadas:")
     for indice, temporada_info in enumerate(historico, start=1):
-        print(f"{indice} - Temporada {temporada_info['temporada']} (Campeão: {temporada_info['campeao']})")
+        campeao = nome_para_exibir(temporada_info["campeao"])
+        print(f"{indice} - Temporada {temporada_info['temporada']} (Campeão: {campeao})")
 
     indice = escolher_numero("Escolha uma temporada para ver os jogos: ", 1, len(historico))
     for fase in historico[indice - 1]["fases"]:
-        exibir_rodada(fase["nome_fase"], fase["confrontos"])
+        exibir_rodada(fase["nome_fase"], _confrontos_com_nomes(fase["confrontos"]))
 
 
 def exibir_campeoes(historico):
@@ -71,12 +90,13 @@ def exibir_campeoes(historico):
     print("\n--- Campeões por temporada ---")
     contagem = {}
     for temporada_info in historico:
-        print(f"{temporada_info['temporada']}: {temporada_info['campeao']}")
-        contagem[temporada_info["campeao"]] = contagem.get(temporada_info["campeao"], 0) + 1
+        id_campeao = temporada_info["campeao"]
+        print(f"{temporada_info['temporada']}: {nome_para_exibir(id_campeao)}")
+        contagem[id_campeao] = contagem.get(id_campeao, 0) + 1
 
     print("\n--- Títulos por time ---")
-    for time, titulos in sorted(contagem.items(), key=lambda item: -item[1]):
-        print(f"{time}: {titulos} título(s)")
+    for id_time, titulos in sorted(contagem.items(), key=lambda item: -item[1]):
+        print(f"{nome_para_exibir(id_time)}: {titulos} título(s)")
 
 
 def exibir_classificacao(historico):
@@ -93,7 +113,7 @@ def exibir_classificacao(historico):
 
     print(f"\n--- Classificação final: Temporada {temporada_info['temporada']} ---")
     for rotulo, integrantes in montar_classificacao(temporada_info["fases"]):
-        print(f"{rotulo}: {', '.join(integrantes)}")
+        print(f"{rotulo}: {', '.join(nome_para_exibir(time) for time in integrantes)}")
 
 
 def escolher_save(acao):
@@ -164,13 +184,7 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
 
     for nome_fase, confrontos, proximos in gerar_rodadas(classificados, time_escolhido, campeonato):
         exibir_rodada(nome_fase, confrontos)
-        fases_da_temporada.append({
-            "nome_fase": nome_fase,
-            "confrontos": [
-                [time_a.nome, time_b.nome, vencedor.nome, gols_a, gols_b]
-                for time_a, time_b, vencedor, gols_a, gols_b in confrontos
-            ],
-        })
+        fases_da_temporada.append(registro_da_fase(nome_fase, confrontos))
 
         if len(proximos) == 1:
             campeao = proximos[0]
@@ -183,7 +197,7 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
 
             historico = historico + [{
                 "temporada": temporada,
-                "campeao": campeao.nome,
+                "campeao": campeao.id,
                 "fases": fases_da_temporada,
             }]
 

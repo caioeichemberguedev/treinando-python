@@ -9,6 +9,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
 DIR_SAVES = os.path.join(BASE_DIR, "saves")
 
+# Versão do formato do save. A 2 guarda o histórico com ids dos times (não
+# nomes); saves sem essa versão são ignorados por `listar_saves()`.
+VERSAO_SAVE = 2
+
 
 def cores_do_time(nome):
     """Devolve uma cópia das 3 cores do time do catálogo com esse nome, ou
@@ -87,12 +91,31 @@ def gerar_nome_save():
     return f"{maior_numero + 1}_{hoje.day:02d}_{hoje.month:02d}_{hoje.year}"
 
 
+def _save_na_versao_atual(nome_save):
+    """True se o arquivo do save é um JSON válido gravado com `VERSAO_SAVE`.
+    Saves antigos (sem versão) ou corrompidos não são apagados — só ficam
+    fora da lista.
+    """
+    try:
+        with open(_caminho_save(nome_save), "r", encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+    except (OSError, ValueError):
+        return False
+    return isinstance(dados, dict) and dados.get("versao") == VERSAO_SAVE
+
+
 def listar_saves():
-    """Lista os nomes das carreiras salvas, da mais antiga para a mais nova."""
+    """Lista os nomes das carreiras salvas, da mais antiga para a mais nova.
+    Só entram saves na versão atual do formato (`VERSAO_SAVE`).
+    """
     if not os.path.isdir(DIR_SAVES):
         return []
 
-    nomes = [nome_arquivo[:-5] for nome_arquivo in os.listdir(DIR_SAVES) if nome_arquivo.endswith(".json")]
+    nomes = [
+        nome_arquivo[:-5]
+        for nome_arquivo in os.listdir(DIR_SAVES)
+        if nome_arquivo.endswith(".json") and _save_na_versao_atual(nome_arquivo[:-5])
+    ]
 
     def numero_do_save(nome):
         prefixo = nome.split("_", 1)[0]
@@ -103,6 +126,7 @@ def listar_saves():
 
 def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None):
     dados = {
+        "versao": VERSAO_SAVE,
         "campeonato": campeonato,
         "time_escolhido": time_escolhido.to_dict(),
         "temporada": temporada,

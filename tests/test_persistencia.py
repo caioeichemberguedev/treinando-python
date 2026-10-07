@@ -124,3 +124,34 @@ def test_carregar_mantem_id_e_cores_gravados_no_arquivo(arquivo_equipes):
 
     assert time.id == 905
     assert time.cores == ["#111111", "#222222", "#333333"]
+
+
+@pytest.fixture
+def dir_saves(tmp_path, monkeypatch):
+    """Aponta a pasta `saves/` para um diretório de teste (nunca o real)."""
+    pasta = tmp_path / "saves"
+    monkeypatch.setattr(persistencia, "DIR_SAVES", str(pasta))
+    return pasta
+
+
+def test_salvar_jogo_grava_a_versao_atual(dir_saves):
+    persistencia.salvar_jogo("1_01_01_2026", "Campeonato Teste", Equipe("Time A", id=901), 2026, None)
+
+    dados = json.loads((dir_saves / "1_01_01_2026.json").read_text(encoding="utf-8"))
+
+    assert persistencia.VERSAO_SAVE == 2
+    assert dados["versao"] == 2
+
+
+def test_listar_saves_ignora_save_antigo_e_json_corrompido(dir_saves):
+    time = Equipe("Time A", id=901)
+    persistencia.salvar_jogo("1_01_01_2026", "Campeonato Teste", time, 2026, [time])
+    antigo = {"campeonato": "Campeonato Teste", "time_escolhido": time.to_dict(), "temporada": 2026,
+              "classificados": None, "historico": []}
+    (dir_saves / "2_01_01_2026.json").write_text(json.dumps(antigo), encoding="utf-8")
+    (dir_saves / "3_01_01_2026.json").write_text("{isso não é json", encoding="utf-8")
+
+    assert persistencia.listar_saves() == ["1_01_01_2026"]
+    # Nada é apagado: os arquivos ignorados continuam no disco.
+    assert os.path.exists(dir_saves / "2_01_01_2026.json")
+    assert os.path.exists(dir_saves / "3_01_01_2026.json")
