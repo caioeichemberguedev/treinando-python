@@ -33,15 +33,10 @@ def equipes():
     }
 
 
-def _sem_saves(monkeypatch):
-    monkeypatch.setattr(menu, "listar_saves", lambda: [])
-
-
 def test_opcoes_antigas_de_elenco_caem_em_opcao_invalida(monkeypatch, capsys, equipes, chamadas_salvar):
     """`a`/`r`/`n` (adicionar/remover/renomear) não existem mais: cada uma
     mostra "Opção inválida." e o elenco não muda.
     """
-    _sem_saves(monkeypatch)
     _simular_teclado(monkeypatch, ["1", "a", "r", "n", "v", "n"])
     nomes_antes = [time.nome for time in equipes["Campeonato Teste"]]
 
@@ -54,7 +49,6 @@ def test_opcoes_antigas_de_elenco_caem_em_opcao_invalida(monkeypatch, capsys, eq
 
 def test_listagem_mostra_so_editar_e_voltar(monkeypatch, capsys, equipes, chamadas_salvar):
     """O menu de equipes não oferece mais adicionar/remover/renomear."""
-    _sem_saves(monkeypatch)
     _simular_teclado(monkeypatch, ["1", "v", "n"])
 
     menu.editar_equipes(equipes)
@@ -68,7 +62,7 @@ def test_listagem_mostra_so_editar_e_voltar(monkeypatch, capsys, equipes, chamad
 
 def test_editar_forca_sem_saves_continua_funcionando(monkeypatch, equipes, chamadas_salvar):
     """Sem carreira salva, a opção `e` edita a força e salva o elenco."""
-    _sem_saves(monkeypatch)
+    monkeypatch.setattr(menu, "listar_saves", lambda: [])
     _simular_teclado(monkeypatch, ["1", "e", "1", "3", "77", "v", "v", "n"])
 
     menu.editar_equipes(equipes)
@@ -77,14 +71,24 @@ def test_editar_forca_sem_saves_continua_funcionando(monkeypatch, equipes, chama
     assert len(chamadas_salvar) == 1
 
 
-def test_editar_com_saves_mostra_bloqueio_e_nao_altera(monkeypatch, capsys, equipes, chamadas_salvar):
-    """Com carreira salva, a opção `e` é bloqueada e nada é alterado."""
+def test_editar_com_saves_edita_e_salva_normalmente(monkeypatch, capsys, equipes, chamadas_salvar):
+    """Com carreira salva, a opção `e` também edita e salva o elenco base —
+    cada carreira já guarda sua própria cópia dos times.
+    """
     monkeypatch.setattr(menu, "listar_saves", lambda: ["x"])
-    _simular_teclado(monkeypatch, ["1", "e", "v", "n"])
-    forcas_antes = [time.forca for time in equipes["Campeonato Teste"]]
+    _simular_teclado(monkeypatch, ["1", "e", "1", "3", "77", "v", "v", "n"])
 
     menu.editar_equipes(equipes)
 
-    assert [time.forca for time in equipes["Campeonato Teste"]] == forcas_antes
-    assert chamadas_salvar == []
-    assert "Não é possível editar finanças/fãs/força" in capsys.readouterr().out
+    assert equipes["Campeonato Teste"][0].forca == 77
+    assert len(chamadas_salvar) == 1
+    assert "Não é possível editar" not in capsys.readouterr().out
+
+
+def test_listagem_mostra_aviso_de_carreiras_novas(monkeypatch, capsys, equipes, chamadas_salvar):
+    """A tela de equipes avisa que a edição só vale para carreiras novas."""
+    _simular_teclado(monkeypatch, ["1", "v", "n"])
+
+    menu.editar_equipes(equipes)
+
+    assert "carreiras novas" in capsys.readouterr().out

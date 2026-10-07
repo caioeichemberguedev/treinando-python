@@ -266,19 +266,18 @@ def editar_equipes(equipes):
                     f"{indice} - {equipe.nome} "
                     f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | ⚡ {equipe.forca}/100 | 🏆 {equipe.titulos})"
                 )
+            print(
+                COR_TXT.ATENCAO,
+                "As alterações valem só para carreiras novas — "
+                "cada carreira salva guarda sua própria cópia dos times.",
+                COR_TXT.NORMAL,
+            )
             print("\ne - Editar finanças/fãs/força")
             print("v - Voltar")
             opcao = input("> ").strip().lower()
 
             if opcao == "e":
-                if listar_saves():
-                    print(
-                        COR_TXT.ERRO,
-                        "Não é possível editar finanças/fãs/força com carreiras salvas em andamento. "
-                        "Esses valores só mudam automaticamente conforme o jogador avança na carreira salva.",
-                        COR_TXT.NORMAL,
-                    )
-                elif not times:
+                if not times:
                     print(COR_TXT.ERRO, "Não há equipes para editar.", COR_TXT.NORMAL)
                 else:
                     indice = escolher_numero("Número da equipe a editar: ", 1, len(times))
