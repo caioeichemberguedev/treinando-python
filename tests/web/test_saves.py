@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -152,3 +153,30 @@ def test_excluir_save_inexistente_retorna_404():
     resposta = client.post("/saves/save_fantasma/excluir")
 
     assert resposta.status_code == 404
+
+
+def test_tela_saves_mostra_um_escudo_por_carreira():
+    _criar_save("1_01_01_2026")
+
+    resposta = client.get("/saves")
+
+    assert resposta.status_code == 200
+    assert resposta.text.count('class="escudo"') == 1
+
+
+def test_tela_saves_save_antigo_sem_cores_usa_cores_do_catalogo():
+    """Save gravado antes do campo `cores` existir: o escudo do time
+    escolhido busca as cores pelo nome no catálogo do elenco padrão."""
+    _criar_save("1_01_01_2026", time_escolhido=Equipe("Brasil"))
+    arquivo = os.path.join(persistencia.DIR_SAVES, "1_01_01_2026.json")
+    with open(arquivo, encoding="utf-8") as f:
+        dados = json.load(f)
+    dados["time_escolhido"].pop("cores", None)
+    with open(arquivo, "w", encoding="utf-8") as f:
+        json.dump(dados, f)
+
+    resposta = client.get("/saves")
+
+    assert resposta.status_code == 200
+    assert resposta.text.count('class="escudo"') == 1
+    assert "#009C3B" in resposta.text
