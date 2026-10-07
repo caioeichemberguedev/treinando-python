@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -155,35 +156,46 @@ def test_editar_equipe_com_valor_invalido_nao_altera_e_mostra_erro(equipes_de_te
     assert time_a == {"nome": "Time A", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50}
 
 
-def test_tela_editar_equipe_com_save_mostra_bloqueio_sem_formulario():
+def _conteudo_do_save_de_teste():
+    return (Path(persistencia.DIR_SAVES) / "1_01_01_2026.json").read_bytes()
+
+
+def test_tela_editar_equipe_com_save_mostra_o_formulario_e_o_aviso():
     _criar_save_de_teste()
 
     resposta = client.get("/equipes/Campeonato Teste/Time A/editar")
 
     assert resposta.status_code == 200
-    assert "Não é possível editar finanças/fãs/força com carreiras salvas" in resposta.text
-    assert 'name="financas"' not in resposta.text
+    assert 'name="financas"' in resposta.text
+    assert 'name="fas"' in resposta.text
+    assert 'name="forca"' in resposta.text
+    assert "carreiras novas" in resposta.text
+    assert "Não é possível editar" not in resposta.text
 
 
-def test_tela_equipes_campeonato_com_save_mostra_bloqueio_e_esconde_link_de_editar():
+def test_tela_equipes_campeonato_com_save_mostra_link_de_editar_e_o_aviso():
     _criar_save_de_teste()
 
     resposta = client.get("/equipes/Campeonato Teste")
 
     assert resposta.status_code == 200
-    assert "Não é possível editar finanças/fãs/força com carreiras salvas" in resposta.text
-    assert "Time A/editar" not in resposta.text
+    assert "Time A/editar" in resposta.text
+    assert "Time B/editar" in resposta.text
+    assert "carreiras novas" in resposta.text
+    assert "Não é possível editar" not in resposta.text
 
 
 def test_tela_equipes_campeonato_sem_saves_mostra_link_de_editar():
     resposta = client.get("/equipes/Campeonato Teste")
 
     assert "Time A/editar" in resposta.text
+    assert "carreiras novas" in resposta.text
     assert "Não é possível editar" not in resposta.text
 
 
-def test_editar_equipe_com_save_e_recusado_e_nao_persiste(equipes_de_teste):
+def test_editar_equipe_com_save_persiste_e_nao_toca_no_save(equipes_de_teste):
     _criar_save_de_teste()
+    save_antes = _conteudo_do_save_de_teste()
 
     resposta = client.post(
         "/equipes/Campeonato Teste/Time A/editar",
@@ -191,12 +203,12 @@ def test_editar_equipe_com_save_e_recusado_e_nao_persiste(equipes_de_teste):
         follow_redirects=False,
     )
 
-    assert resposta.status_code == 403
-    assert "Não é possível editar finanças/fãs/força com carreiras salvas" in resposta.text
-
+    assert resposta.status_code == 303
     time_a = _equipe_salva(equipes_de_teste, "Campeonato Teste", "Time A")
-    assert time_a["forca"] == 50
-    assert time_a["financas"] == 1_000_000
+    assert time_a["financas"] == 2_500_000
+    assert time_a["fas"] == 75_000
+    assert time_a["forca"] == 88
+    assert _conteudo_do_save_de_teste() == save_antes
 
 
 def test_tela_equipes_tem_link_para_restaurar_padrao():

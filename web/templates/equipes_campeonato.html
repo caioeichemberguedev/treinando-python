@@ -5,9 +5,7 @@
 {% block conteudo %}
     <h1>Equipes: {{ campeonato }}</h1>
 
-    {% if edicao_bloqueada %}
-        <p>{{ mensagem_bloqueio }}</p>
-    {% endif %}
+    <p>{{ aviso }}</p>
 
     <table>
         <thead>
@@ -17,9 +15,7 @@
                 <th>Fãs</th>
                 <th>Força</th>
                 <th>Títulos</th>
-                {% if not edicao_bloqueada %}
                 <th>Finanças/fãs/força</th>
-                {% endif %}
             </tr>
         </thead>
         <tbody>
@@ -30,11 +26,9 @@
                 <td>{{ "{:,}".format(time.fas) }}</td>
                 <td>{{ time.forca }}/100</td>
                 <td>{{ time.titulos }}</td>
-                {% if not edicao_bloqueada %}
                 <td>
                     <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, nome_equipe=time.nome) }}" class="botao">Editar</a>
                 </td>
-                {% endif %}
             </tr>
         {% endfor %}
         </tbody>

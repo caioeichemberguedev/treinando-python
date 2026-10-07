@@ -10,10 +10,10 @@ padrão" de `menu.menu_principal`. Restaurar o padrão é uma ação destrutiva,
 então passa por uma tela de confirmação antes do POST que efetivamente
 executa, do mesmo jeito que o terminal pede confirmação por texto ("s/n").
 
-A edição de finanças/fãs/força segue a mesma regra do terminal: fica
-bloqueada enquanto existir qualquer carreira em `saves/`. A trava é checada
-tanto na tela (que não mostra o formulário) quanto no POST (que recusa), pra
-não depender só do template.
+A edição de finanças/fãs/força é sempre permitida, mesmo com carreiras
+salvas (igual ao terminal): cada carreira guarda sua própria cópia dos
+times, então a edição do elenco base só vale para carreiras novas. As telas
+mostram `AVISO_CARREIRAS_NOVAS` para deixar isso claro.
 """
 
 from typing import Annotated
@@ -21,14 +21,13 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from persistencia import carregar_equipes, listar_saves, restaurar_equipes_padrao, salvar_equipes
+from persistencia import carregar_equipes, restaurar_equipes_padrao, salvar_equipes
 from web.templates_config import templates
 
 router = APIRouter(tags=["equipes"])
 
-MENSAGEM_EDICAO_BLOQUEADA = (
-    "Não é possível editar finanças/fãs/força com carreiras salvas em andamento. "
-    "Esses valores só mudam automaticamente conforme o jogador avança na carreira salva."
+AVISO_CARREIRAS_NOVAS = (
+    "As alterações valem só para carreiras novas — cada carreira salva guarda sua própria cópia dos times."
 )
 
 
@@ -46,19 +45,11 @@ def _equipe_do_campeonato(times, nome_equipe):
     return equipe
 
 
-def _edicao_bloqueada():
-    """Mesma trava de `menu.editar_equipes` (opção "e"): finanças/fãs/força
-    só podem ser editadas enquanto não houver nenhuma carreira salva.
-    """
-    return bool(listar_saves())
-
-
 def _contexto_campeonato(campeonato, times):
     return {
         "campeonato": campeonato,
         "times": times,
-        "edicao_bloqueada": _edicao_bloqueada(),
-        "mensagem_bloqueio": MENSAGEM_EDICAO_BLOQUEADA,
+        "aviso": AVISO_CARREIRAS_NOVAS,
     }
 
 
@@ -67,8 +58,7 @@ def _contexto_edicao(campeonato, equipe, erros=None):
         "campeonato": campeonato,
         "equipe": equipe,
         "erros": erros or [],
-        "edicao_bloqueada": _edicao_bloqueada(),
-        "mensagem_bloqueio": MENSAGEM_EDICAO_BLOQUEADA,
+        "aviso": AVISO_CARREIRAS_NOVAS,
     }
 
 
@@ -128,8 +118,8 @@ def tela_equipes_campeonato(request: Request, campeonato: str):
 
 @router.get("/equipes/{campeonato}/{nome_equipe}/editar")
 def tela_editar_equipe(request: Request, campeonato: str, nome_equipe: str):
-    """Sub-tela de edição de finanças/fãs/força de uma equipe. Com carreiras
-    salvas, mostra a mensagem de bloqueio no lugar do formulário.
+    """Sub-tela de edição de finanças/fãs/força de uma equipe. Sempre mostra
+    o formulário — a edição só vale para carreiras novas.
     """
     equipes = carregar_equipes()
     times = _times_do_campeonato(equipes, campeonato)
@@ -147,19 +137,14 @@ def editar_equipe(
     forca: Annotated[str, Form()] = "",
 ):
     """Salva finanças/fãs/força de uma equipe, validando com as mesmas faixas
-    do terminal (finanças e fãs >= 0, força entre 0 e 100). Recusa (403) se
-    houver carreiras salvas, mesmo que o formulário seja enviado por fora da
-    tela. Os campos têm default vazio para que um campo em branco caia na
-    mesma mensagem de validação amigável em vez de um 422 genérico.
+    do terminal (finanças e fãs >= 0, força entre 0 e 100). Funciona mesmo
+    com carreiras salvas: só altera `equipes.json`, nunca `saves/`. Os campos
+    têm default vazio para que um campo em branco caia na mesma mensagem de
+    validação amigável em vez de um 422 genérico.
     """
     equipes = carregar_equipes()
     times = _times_do_campeonato(equipes, campeonato)
     equipe = _equipe_do_campeonato(times, nome_equipe)
-
-    if _edicao_bloqueada():
-        return templates.TemplateResponse(
-            request, "equipes_editar.html", _contexto_edicao(campeonato, equipe), status_code=403
-        )
 
     valor_financas, erro_financas = _validar_inteiro(financas, "Finanças", 0)
     valor_fas, erro_fas = _validar_inteiro(fas, "Fãs", 0)
