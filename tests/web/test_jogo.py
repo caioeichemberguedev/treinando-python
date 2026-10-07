@@ -374,7 +374,12 @@ def test_fase_repetida_nao_recalcula_o_resultado():
     primeira = client.get("/fase")
     segunda = client.get("/fase")
 
-    assert primeira.text == segunda.text
+    # O id do clipPath de cada escudo é único por render (contador em
+    # web/escudo.py), então é normalizado antes de comparar.
+    def sem_ids_de_escudo(html):
+        return re.sub(r"escudo-clip-\d+", "escudo-clip-N", html)
+
+    assert sem_ids_de_escudo(primeira.text) == sem_ids_de_escudo(segunda.text)
 
 
 def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
@@ -535,3 +540,94 @@ def test_completar_duas_temporadas_acumula_dois_itens_no_historico():
     assert len(jogo.historico) == 2
     assert jogo.historico[0]["temporada"] == 2026
     assert jogo.historico[1]["temporada"] == 2027
+
+
+# --- Escudos nas telas de jogo (ID-005-T4) ---
+
+CORES_TIME_A = ["#123456", "#ABCDEF", "#0F0F0F"]
+CORES_TIME_B = ["#FEDCBA", "#654321", "#F0F0F0"]
+
+
+def _contar_escudos(html):
+    return html.count('class="escudo"')
+
+
+def _dar_cores_aos_times_de_teste():
+    """Regrava o `equipes.json` de teste com cores em Time A/Time B, para
+    conferir que o hex de cada time chega no HTML.
+    """
+    caminho = persistencia.ARQUIVO_EQUIPES
+    with open(caminho, encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+    dados["Campeonato Teste"][0]["cores"] = CORES_TIME_A
+    dados["Campeonato Teste"][1]["cores"] = CORES_TIME_B
+    with open(caminho, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo)
+
+
+def test_escolher_time_mostra_um_escudo_grande_por_time():
+    resposta = client.post("/novo-jogo", data={"campeonato": "Copa Teste"})
+
+    assert resposta.status_code == 200
+    assert _contar_escudos(resposta.text) == 4
+    assert resposta.text.count('width="40"') == 4
+
+
+def test_escolher_time_mostra_as_cores_do_time():
+    _dar_cores_aos_times_de_teste()
+
+    resposta = client.post("/novo-jogo", data={"campeonato": "Campeonato Teste"})
+
+    for cor in CORES_TIME_A + CORES_TIME_B:
+        assert cor in resposta.text
+
+
+def test_fase_mostra_escudos_do_seu_time_e_de_cada_confronto():
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "Copa E"})
+
+    resposta = _passar_pela_fase_atual()
+
+    confrontos = estado.obter_jogo().fase_atual["confrontos"]
+    assert len(confrontos) == 2
+    assert _contar_escudos(resposta.text) >= 3 * len(confrontos) + 1
+    assert 'aria-label="Escudo do Copa E"' in resposta.text
+
+
+def test_fase_mostra_as_cores_dos_times():
+    _dar_cores_aos_times_de_teste()
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+
+    resposta = _passar_pela_fase_atual()
+
+    for cor in CORES_TIME_A + CORES_TIME_B:
+        assert cor in resposta.text
+
+
+def test_penaltis_mostra_escudo_do_jogador_e_do_adversario():
+    _dar_cores_aos_times_de_teste()
+    _iniciar_disputa_de_teste()
+
+    resposta = client.get("/fase/penaltis")
+
+    assert resposta.status_code == 200
+    assert 'aria-label="Escudo do Time A"' in resposta.text
+    assert 'aria-label="Escudo do Time B"' in resposta.text
+    assert _contar_escudos(resposta.text) == 4  # 2 no topo (40) + 2 no placar (20)
+    for cor in CORES_TIME_A + CORES_TIME_B:
+        assert cor in resposta.text
+
+
+def test_campeao_mostra_escudo_em_destaque():
+    _dar_cores_aos_times_de_teste()
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    resposta = client.get("/campeao")
+
+    assert resposta.status_code == 200
+    assert 'width="96"' in resposta.text
+    campeao = estado.obter_jogo().campeao
+    assert f'aria-label="Escudo do {campeao}"' in resposta.text
+    for cor in campeao.cores:
+        assert cor in resposta.text
