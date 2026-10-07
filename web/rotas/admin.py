@@ -1,4 +1,5 @@
-"""Rotas da área adm (`/admin`): login, logout e lista dos times.
+"""Rotas da área adm (`/admin`): login, logout, lista dos times e edição
+do nome/cores de cada time.
 
 Decisões 6 e 7 do ID-008 (ver `docs/backlog.md`):
 
@@ -11,6 +12,10 @@ Decisões 6 e 7 do ID-008 (ver `docs/backlog.md`):
 - A senha digitada nunca volta para o template, para o log ou para o
   cookie.
 - Não há link para `/admin` no menu do jogador: o adm digita a URL.
+- Edição do time (decisões 4 e 8): o formulário sempre manda os 4
+  seletores de cor; só as `faixas` primeiras valem, o resto é ignorado.
+  "Pré-visualizar" só redesenha o escudo (sem JavaScript); "Salvar" grava
+  no catálogo do adm (`catalogo.salvar_time_no_catalogo`).
 """
 
 from typing import Annotated
@@ -27,6 +32,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 URL_LOGIN = "/admin/login"
 URL_ADMIN = "/admin"
 CAMINHO_COOKIE = "/admin"
+
+# Valor inicial dos seletores de cor excedentes (ou enviados vazios).
+COR_SELETOR_PADRAO = "#FFFFFF"
 
 
 def _exigir_area_ativa():
@@ -105,3 +113,125 @@ def sair_admin(request: Request):
         samesite="strict",
     )
     return resposta
+
+
+def _id_time_existente(id_time: int) -> int:
+    """404 se o id não existir no catálogo efetivo."""
+    if catalogo.nome_do_time(id_time) is None:
+        raise HTTPException(status_code=404, detail="Time não encontrado.")
+    return id_time
+
+
+def _completar_cores(cores: list[str]) -> list[str]:
+    """Estende `cores` até `MAXIMO_CORES` (os seletores excedentes do
+    formulário precisam de um valor inicial)."""
+    faltam = catalogo.MAXIMO_CORES - len(cores)
+    return list(cores[:catalogo.MAXIMO_CORES]) + [COR_SELETOR_PADRAO] * faltam
+
+
+def _contexto_time(id_time, nome, faixas, cores, cores_previa, erros):
+    """Contexto do `admin_time.html`.
+
+    `cores` são os 4 valores dos seletores (em minúsculas, o formato que o
+    `<input type="color">` usa); `cores_previa` vai para `escudo(...,
+    cores=...)` — None desenha as cores atuais do catálogo.
+    """
+    return {
+        "id_time": id_time,
+        "nome": nome,
+        "faixas": faixas,
+        "opcoes_faixas": range(catalogo.MINIMO_CORES, catalogo.MAXIMO_CORES + 1),
+        "cores": [cor.lower() for cor in _completar_cores(cores)],
+        "cores_previa": cores_previa,
+        "erros": erros,
+    }
+
+
+def _ler_faixas(faixas: str) -> int | None:
+    """Converte o campo `faixas` em int de 1 a 4; inválido → None."""
+    try:
+        valor = int(faixas.strip())
+    except ValueError:
+        return None
+    if not catalogo.MINIMO_CORES <= valor <= catalogo.MAXIMO_CORES:
+        return None
+    return valor
+
+
+@router.get("/times/{id_time}", dependencies=[Depends(_exigir_admin)])
+def tela_editar_time_admin(request: Request, id_time: int):
+    """Formulário de edição já preenchido com o catálogo efetivo."""
+    _id_time_existente(id_time)
+    cores = catalogo.cores_do_time(id_time)
+    contexto = _contexto_time(
+        id_time, catalogo.nome_do_time(id_time), len(cores), cores, None, []
+    )
+    return templates.TemplateResponse(request, "admin_time.html", contexto)
+
+
+@router.post("/times/{id_time}", dependencies=[Depends(_exigir_admin)])
+def salvar_time_admin(
+    request: Request,
+    id_time: int,
+    nome: Annotated[str, Form()] = "",
+    faixas: Annotated[str, Form()] = "",
+    cor_1: Annotated[str, Form()] = "",
+    cor_2: Annotated[str, Form()] = "",
+    cor_3: Annotated[str, Form()] = "",
+    cor_4: Annotated[str, Form()] = "",
+    acao: Annotated[str, Form()] = "previa",
+):
+    """Valida o formulário. `acao=salvar` válido → grava e volta para
+    `/admin` (303); qualquer outra ação só mostra a prévia (200), sem
+    gravar. Inválido → 400 com as mensagens e o catálogo intacto.
+
+    Os campos têm default vazio para que um campo faltando caia numa
+    mensagem em português em vez de um 422 genérico.
+    """
+    _id_time_existente(id_time)
+    enviadas = [cor.strip() for cor in (cor_1, cor_2, cor_3, cor_4)]
+
+    erros = []
+    quantidade = _ler_faixas(faixas)
+    if quantidade is None:
+        erros.append(
+            f"A quantidade de faixas deve ser um número de "
+            f"{catalogo.MINIMO_CORES} a {catalogo.MAXIMO_CORES}."
+        )
+        cores = []
+    else:
+        cores = enviadas[:quantidade]
+        for posicao, cor in enumerate(cores, start=1):
+            if not cor:
+                erros.append(f"Escolha a cor da faixa {posicao}.")
+
+    if not erros:
+        erros = catalogo.validar_time(id_time, nome, cores)
+
+    # Os seletores voltam com o que foi enviado (ou a cor padrão, se vazio).
+    cores_formulario = [cor or COR_SELETOR_PADRAO for cor in enviadas]
+    if erros:
+        contexto = _contexto_time(
+            id_time, nome, quantidade, cores_formulario, None, erros
+        )
+        return templates.TemplateResponse(
+            request, "admin_time.html", contexto, status_code=400
+        )
+
+    cores = [cor.upper() for cor in cores]
+    if acao == "salvar":
+        try:
+            catalogo.salvar_time_no_catalogo(id_time, nome, cores)
+        except ValueError as erro:
+            contexto = _contexto_time(
+                id_time, nome, quantidade, cores_formulario, None, [str(erro)]
+            )
+            return templates.TemplateResponse(
+                request, "admin_time.html", contexto, status_code=400
+            )
+        return RedirectResponse(url=URL_ADMIN, status_code=303)
+
+    contexto = _contexto_time(
+        id_time, nome.strip(), quantidade, cores_formulario, cores, []
+    )
+    return templates.TemplateResponse(request, "admin_time.html", contexto)

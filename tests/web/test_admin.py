@@ -51,6 +51,8 @@ def _sem_senha_na_resposta(resposta):
         ("GET", "/admin/login"),
         ("POST", "/admin/login"),
         ("POST", "/admin/sair"),
+        ("GET", "/admin/times/1"),
+        ("POST", "/admin/times/1"),
     ],
 )
 def test_sem_admin_senha_todas_as_rotas_dao_404(sem_senha, cliente, metodo, url):
@@ -136,8 +138,8 @@ def test_depois_do_login_admin_lista_os_32_times(com_senha, cliente):
 
     assert resposta.status_code == 200
     for time in catalogo.TIMES_PADRAO:
-        assert f'href="/admin/times/{time["id"]}"' in resposta.text
-    assert resposta.text.count('href="/admin/times/') == 32
+        assert f'/admin/times/{time["id"]}"' in resposta.text
+    assert resposta.text.count('/admin/times/') == 32
     assert "Copa do Brasil" in resposta.text
     assert "Copa do Mundo 2026" in resposta.text
     assert "<svg" in resposta.text
@@ -340,3 +342,210 @@ def test_cookie_do_admin_nao_vai_para_rotas_do_jogo(com_senha, cliente):
     assert sessao_admin.COOKIE_SESSAO not in resposta.request.headers.get(
         "cookie", ""
     )
+
+
+# --- Edição do time (ID-008-T7) ---------------------------------------------
+
+def _editar(cliente, id_time=1, **campos):
+    return cliente.post(
+        f"/admin/times/{id_time}", data=campos, follow_redirects=False
+    )
+
+
+@pytest.mark.parametrize("metodo", ["GET", "POST"])
+def test_editar_time_sem_login_redireciona(com_senha, cliente, metodo):
+    resposta = cliente.request(
+        metodo, "/admin/times/1",
+        data={"nome": "X", "faixas": "1", "cor_1": "#ff0000",
+              "acao": "salvar"} if metodo == "POST" else None,
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/admin/login"
+    assert catalogo.nome_do_time(1) == "São Paulo"
+
+
+@pytest.mark.parametrize("metodo", ["GET", "POST"])
+def test_editar_time_inexistente_da_404(com_senha, cliente, metodo):
+    _logar(cliente)
+
+    resposta = cliente.request(
+        metodo, "/admin/times/999",
+        data={"nome": "X", "faixas": "1", "cor_1": "#ff0000"}
+        if metodo == "POST" else None,
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 404
+
+
+def test_lista_tem_link_para_editar(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin")
+
+    assert 'href="http://testserver/admin/times/3"' in resposta.text
+
+
+def test_get_editar_mostra_nome_faixas_e_cores_atuais(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin/times/3")
+
+    assert resposta.status_code == 200
+    assert 'value="Corinthians"' in resposta.text
+    assert '<option value="2" selected>' in resposta.text
+    assert 'name="cor_1" value="#000000"' in resposta.text
+    assert 'name="cor_2" value="#ffffff"' in resposta.text
+    assert resposta.text.count('type="color"') == 4
+    assert 'value="previa"' in resposta.text
+    assert 'value="salvar"' in resposta.text
+    assert "<script" not in resposta.text
+    _sem_senha_na_resposta(resposta)
+
+
+def test_previa_mostra_cores_e_nao_grava(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 3, nome="Timão", faixas="3", cor_1="#111111",
+        cor_2="#222222", cor_3="#abcdef", cor_4="#444444", acao="previa",
+    )
+
+    assert resposta.status_code == 200
+    for cor in ("#111111", "#222222", "#ABCDEF"):
+        assert f'fill="{cor}"' in resposta.text
+    assert 'fill="#444444"' not in resposta.text
+    assert 'value="Timão"' in resposta.text
+    assert catalogo.nome_do_time(3) == "Corinthians"
+    assert catalogo.cores_do_time(3) == ["#000000", "#FFFFFF"]
+
+
+def test_salvar_valido_grava_e_redireciona(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="SPFC", faixas="1", cor_1="#ff0000", acao="salvar"
+    )
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/admin"
+    assert catalogo.nome_do_time(1) == "SPFC"
+    assert catalogo.cores_do_time(1) == ["#FF0000"]
+
+
+def test_salvar_ignora_cores_excedentes(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="São Paulo", faixas="2", cor_1="#ff0000",
+        cor_2="#00ff00", cor_3="#0000ff", cor_4="lixo", acao="salvar",
+    )
+
+    assert resposta.status_code == 303
+    assert catalogo.cores_do_time(1) == ["#FF0000", "#00FF00"]
+
+
+@pytest.mark.parametrize(
+    "campos, mensagem",
+    [
+        ({"nome": "Palmeiras", "faixas": "1", "cor_1": "#ff0000"},
+         "Já existe um time chamado Palmeiras"),
+        ({"nome": "palmeiras", "faixas": "1", "cor_1": "#ff0000"},
+         "Já existe um time chamado Palmeiras"),
+        ({"nome": "   ", "faixas": "1", "cor_1": "#ff0000"},
+         "não pode ficar vazio"),
+        ({"faixas": "1", "cor_1": "#ff0000"}, "não pode ficar vazio"),
+        ({"nome": "SPFC", "faixas": "0", "cor_1": "#ff0000"},
+         "quantidade de faixas"),
+        ({"nome": "SPFC", "faixas": "5", "cor_1": "#ff0000"},
+         "quantidade de faixas"),
+        ({"nome": "SPFC", "faixas": "abc", "cor_1": "#ff0000"},
+         "quantidade de faixas"),
+        ({"nome": "SPFC", "cor_1": "#ff0000"}, "quantidade de faixas"),
+        ({"nome": "SPFC", "faixas": "2", "cor_1": "#ff0000"},
+         "Escolha a cor da faixa 2"),
+        ({"nome": "SPFC", "faixas": "2", "cor_1": "#ff0000", "cor_2": ""},
+         "Escolha a cor da faixa 2"),
+        ({"nome": "SPFC", "faixas": "1", "cor_1": "red"}, "#RRGGBB"),
+        ({"nome": "S" * 41, "faixas": "1", "cor_1": "#ff0000"},
+         "no máximo 40"),
+    ],
+)
+@pytest.mark.parametrize("acao", ["salvar", "previa"])
+def test_editar_invalido_da_400_e_nao_grava(
+    com_senha, cliente, campos, mensagem, acao
+):
+    _logar(cliente)
+
+    resposta = _editar(cliente, 1, acao=acao, **campos)
+
+    assert resposta.status_code == 400
+    assert mensagem in resposta.text
+    assert catalogo.nome_do_time(1) == "São Paulo"
+    assert catalogo.cores_do_time(1) == ["#E30613", "#FFFFFF", "#000000"]
+
+
+def test_nome_com_html_e_escapado(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome='<b>"x"</b>', faixas="1", cor_1="#ff0000",
+        acao="previa",
+    )
+
+    assert resposta.status_code == 200
+    assert '<b>"x"</b>' not in resposta.text
+    assert "&lt;b&gt;" in resposta.text
+
+
+def test_manter_o_proprio_nome_nao_e_duplicado(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 3, nome="Corinthians", faixas="2", cor_1="#000000",
+        cor_2="#ffffff", acao="salvar",
+    )
+
+    assert resposta.status_code == 303
+
+
+@pytest.mark.parametrize("metodo", ["GET", "POST"])
+def test_editar_time_id_nao_numerico_da_422(com_senha, cliente, metodo):
+    _logar(cliente)
+
+    resposta = cliente.request(
+        metodo, "/admin/times/abc", follow_redirects=False
+    )
+
+    assert resposta.status_code == 422
+
+
+@pytest.mark.parametrize("acao", ["salvar", "previa"])
+def test_cor_maliciosa_e_rejeitada(com_senha, cliente, acao):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="SPFC", faixas="1",
+        cor_1='"><script>alert(1)</script>', acao=acao,
+    )
+
+    assert resposta.status_code == 400
+    assert "<script>alert" not in resposta.text
+    assert catalogo.cores_do_time(1) == ["#E30613", "#FFFFFF", "#000000"]
+
+
+def test_nome_com_script_salvo_aparece_escapado(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="<script>alert(1)</script>", faixas="1",
+        cor_1="#ff0000", acao="salvar",
+    )
+    assert resposta.status_code == 303
+
+    for url in ("/admin", "/admin/times/1"):
+        tela = cliente.get(url)
+        assert "<script>alert" not in tela.text
+        assert "&lt;script&gt;" in tela.text

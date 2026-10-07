@@ -22,7 +22,7 @@
             {% for id_time in ids %}
                 <tr>
                     <td><span class="time">{{ escudo(id_time, 40) }}{{ nome_time(id_time) }}</span></td>
-                    <td><a href="/admin/times/{{ id_time }}" class="botao">Editar</a></td>
+                    <td><a href="{{ url_for('tela_editar_time_admin', id_time=id_time) }}" class="botao">Editar</a></td>
                 </tr>
             {% endfor %}
             </tbody>
