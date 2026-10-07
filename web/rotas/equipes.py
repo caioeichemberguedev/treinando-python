@@ -38,8 +38,11 @@ def _times_do_campeonato(equipes, campeonato):
     return times
 
 
-def _equipe_do_campeonato(times, nome_equipe):
-    equipe = next((time for time in times if time == nome_equipe), None)
+def _equipe_do_campeonato(times, id_equipe):
+    """Busca a equipe pelo `id` (não pelo nome) dentro do campeonato. Um id
+    que existe só em outro campeonato também cai no 404.
+    """
+    equipe = next((time for time in times if time.id == id_equipe), None)
     if equipe is None:
         raise HTTPException(status_code=404, detail="Equipe não encontrada nesse campeonato.")
     return equipe
@@ -116,22 +119,24 @@ def tela_equipes_campeonato(request: Request, campeonato: str):
     return templates.TemplateResponse(request, "equipes_campeonato.html", _contexto_campeonato(campeonato, times))
 
 
-@router.get("/equipes/{campeonato}/{nome_equipe}/editar")
-def tela_editar_equipe(request: Request, campeonato: str, nome_equipe: str):
+# `id_equipe: int` faz o FastAPI validar o caminho: um texto no lugar do id
+# (ex.: o nome do time) vira 422 antes de chegar aqui, nunca 500.
+@router.get("/equipes/{campeonato}/{id_equipe}/editar")
+def tela_editar_equipe(request: Request, campeonato: str, id_equipe: int):
     """Sub-tela de edição de finanças/fãs/força de uma equipe. Sempre mostra
     o formulário — a edição só vale para carreiras novas.
     """
     equipes = carregar_equipes()
     times = _times_do_campeonato(equipes, campeonato)
-    equipe = _equipe_do_campeonato(times, nome_equipe)
+    equipe = _equipe_do_campeonato(times, id_equipe)
     return templates.TemplateResponse(request, "equipes_editar.html", _contexto_edicao(campeonato, equipe))
 
 
-@router.post("/equipes/{campeonato}/{nome_equipe}/editar")
+@router.post("/equipes/{campeonato}/{id_equipe}/editar")
 def editar_equipe(
     request: Request,
     campeonato: str,
-    nome_equipe: str,
+    id_equipe: int,
     financas: Annotated[str, Form()] = "",
     fas: Annotated[str, Form()] = "",
     forca: Annotated[str, Form()] = "",
@@ -144,7 +149,7 @@ def editar_equipe(
     """
     equipes = carregar_equipes()
     times = _times_do_campeonato(equipes, campeonato)
-    equipe = _equipe_do_campeonato(times, nome_equipe)
+    equipe = _equipe_do_campeonato(times, id_equipe)
 
     valor_financas, erro_financas = _validar_inteiro(financas, "Finanças", 0)
     valor_fas, erro_fas = _validar_inteiro(fas, "Fãs", 0)

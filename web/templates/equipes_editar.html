@@ -15,7 +15,7 @@
         </ul>
     {% endif %}
 
-    <form method="post" action="{{ url_for('editar_equipe', campeonato=campeonato, nome_equipe=equipe.nome) }}">
+    <form method="post" action="{{ url_for('editar_equipe', campeonato=campeonato, id_equipe=equipe.id) }}">
         <p>
             <label>
                 Finanças (R$):

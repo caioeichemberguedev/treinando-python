@@ -27,7 +27,7 @@
                 <td>{{ time.forca }}/100</td>
                 <td>{{ time.titulos }}</td>
                 <td>
-                    <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, nome_equipe=time.nome) }}" class="botao">Editar</a>
+                    <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, id_equipe=time.id) }}" class="botao">Editar</a>
                 </td>
             </tr>
         {% endfor %}
