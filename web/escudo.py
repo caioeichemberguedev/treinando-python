@@ -2,7 +2,9 @@
 cor do time, recortadas no formato de escudo.
 
 Registrado como global `escudo` do Jinja2 em `web/templates_config.py`:
-`{{ escudo(time) }}` ou `{{ escudo(campeao, 96) }}` nos templates.
+`{{ escudo(time) }}` ou `{{ escudo(campeao, 96) }}` nos templates. `time`
+pode ser uma `Equipe`, o id do time (`int`, formato do histórico), uma
+string crua ou None.
 """
 
 import itertools
@@ -10,10 +12,10 @@ import re
 
 from markupsafe import Markup, escape
 
-import persistencia
+import catalogo
 from equipe import Equipe
 
-# Escudo cinza para times sem cores conhecidas (ex.: nome fora do catálogo)
+# Escudo cinza para times sem cores conhecidas (ex.: id fora do catálogo)
 # ou com alguma cor inválida.
 CORES_ESCUDO_PADRAO = ["#9E9E9E", "#BDBDBD", "#9E9E9E"]
 
@@ -34,13 +36,13 @@ _PADRAO_HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 _contador_ids = itertools.count(1)
 
 
-def _nome_do_time(time):
-    """Devolve o nome do time (Equipe ou string) ou "" quando não há time."""
-    if time is None:
-        return ""
+def _id_do_time(time):
+    """Devolve o id do time (de uma `Equipe` ou de um `int`), ou None."""
     if isinstance(time, Equipe):
-        return time.nome
-    return str(time)
+        return time.id
+    if isinstance(time, int) and not isinstance(time, bool):
+        return time
+    return None
 
 
 def _cores_validas(cores):
@@ -53,30 +55,35 @@ def _cores_validas(cores):
 
 
 def _resolver_cores(time):
-    """Escolhe as cores do escudo: `Equipe.cores` → catálogo do elenco
-    padrão (`persistencia.cores_do_time`) → cinza padrão.
+    """Escolhe as cores do escudo, nesta ordem: id conhecido no catálogo →
+    `Equipe.cores` válidas → string crua buscada no catálogo pelo nome
+    (compatibilidade temporária) → cinza padrão.
     """
-    cores = None
-    if isinstance(time, Equipe) and time.cores is not None:
-        cores = time.cores
-    else:
-        nome = _nome_do_time(time)
-        if nome:
-            cores = persistencia.cores_do_time(nome)
+    id_time = _id_do_time(time)
+    if id_time is not None:
+        cores = catalogo.cores_do_time(id_time)
+        if cores is not None and _cores_validas(cores):
+            return cores
 
-    if cores is None or not _cores_validas(cores):
-        return list(CORES_ESCUDO_PADRAO)
-    return list(cores)
+    if isinstance(time, Equipe) and _cores_validas(time.cores):
+        return list(time.cores)
+
+    if isinstance(time, str) and time:
+        cores = catalogo.cores_do_time(catalogo.id_do_time_por_nome(time))
+        if cores is not None and _cores_validas(cores):
+            return cores
+
+    return list(CORES_ESCUDO_PADRAO)
 
 
 def escudo_svg(time, tamanho=24):
-    """Gera o SVG inline do escudo de `time` (Equipe, string ou None).
+    """Gera o SVG inline do escudo de `time` (Equipe, id, string ou None).
 
     `tamanho` é a largura em pixels; a altura segue a proporção 1:1.2 do
     escudo. Retorna `Markup` para o Jinja2 não escapar o SVG — por isso o
     nome é escapado aqui e as cores são validadas antes de entrar no HTML.
     """
-    nome = _nome_do_time(time)
+    nome = catalogo.nome_para_exibir(time)
     rotulo = escape(f"Escudo do {nome}" if nome else "Escudo")
     cores = _resolver_cores(time)
     id_clip = f"escudo-clip-{next(_contador_ids)}"

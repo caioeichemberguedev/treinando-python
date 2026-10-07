@@ -16,7 +16,7 @@
         {% for rotulo, integrantes in grupos %}
             <tr>
                 <td>{{ rotulo }}</td>
-                <td>{% for time in integrantes %}<span class="time">{{ escudo(time, 20) }}{{ time }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+                <td>{% for time in integrantes %}<span class="time">{{ escudo(time, 20) }}{{ nome_time(time) }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</td>
             </tr>
         {% endfor %}
         </tbody>

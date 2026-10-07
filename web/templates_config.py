@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
+import catalogo
+
 from web.escudo import escudo_svg
 
 BASE = Path(__file__).parent
@@ -19,3 +21,7 @@ templates = Jinja2Templates(directory=BASE / "templates")
 
 # `{{ escudo(time) }}` / `{{ escudo(time, 96) }}` nos templates.
 templates.env.globals["escudo"] = escudo_svg
+
+# `{{ nome_time(time) }}` nos templates: resolve o nome de exibição a partir
+# do id (histórico), de uma `Equipe` ou de uma string.
+templates.env.globals["nome_time"] = catalogo.nome_para_exibir

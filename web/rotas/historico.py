@@ -39,14 +39,14 @@ def _temporada_do_historico(historico: list, indice: int) -> dict:
     return historico[indice - 1]
 
 
-def _contar_titulos(historico: list) -> list[tuple[str, int]]:
-    """Conta os títulos de cada time, do maior para o menor (empates mantêm
-    a ordem de primeira conquista, igual a `exibir_campeoes`).
+def _contar_titulos(historico: list) -> list[tuple[int, int]]:
+    """Conta os títulos de cada time pelo id, do maior para o menor (empates
+    mantêm a ordem de primeira conquista, igual a `exibir_campeoes`).
 
-    Normaliza pelo nome: no fluxo web `campeao` é um objeto `Equipe`; em
-    saves carregados do JSON é uma string crua.
+    O histórico guarda `campeao` como id do time; o template resolve o nome
+    com `nome_time`.
     """
-    contagem = Counter(str(info["campeao"]) for info in historico)
+    contagem = Counter(info["campeao"] for info in historico)
     return sorted(contagem.items(), key=lambda item: -item[1])
 
 
@@ -83,11 +83,8 @@ def tela_historico_classificacao(request: Request, indice: int):
     por `campeonato.montar_classificacao` (igual `exibir_classificacao`)."""
     jogo = _jogo_em_andamento()
     temporada_info = _temporada_do_historico(jogo.historico, indice)
-    classificacao = montar_classificacao(temporada_info["fases"])
-    grupos = [
-        (rotulo, [str(time) for time in integrantes])
-        for rotulo, integrantes in classificacao
-    ]
+    # Os grupos levam os ids do histórico; o template resolve o nome.
+    grupos = montar_classificacao(temporada_info["fases"])
     return templates.TemplateResponse(
         request,
         "classificacao.html",

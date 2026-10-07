@@ -2,7 +2,7 @@ import re
 
 from markupsafe import Markup
 
-import persistencia
+import catalogo
 from equipe import Equipe
 from web.escudo import CORES_ESCUDO_PADRAO, escudo_svg
 from web.templates_config import templates
@@ -39,21 +39,52 @@ def test_duas_chamadas_geram_ids_de_clip_diferentes():
 
 
 def test_string_crua_usa_cores_do_catalogo():
+    _assert_usa_cores(str(escudo_svg("São Paulo")), catalogo.cores_do_time(1))
+
+
+def test_id_do_catalogo_usa_cores_do_catalogo():
+    _assert_usa_cores(str(escudo_svg(1)), catalogo.cores_do_time(1))
+
+
+def test_equipe_com_id_do_catalogo_usa_cores_do_catalogo():
     _assert_usa_cores(
-        str(escudo_svg("São Paulo")), persistencia.cores_do_time("São Paulo")
+        str(escudo_svg(Equipe("X", id=1))), catalogo.cores_do_time(1)
     )
 
 
-def test_equipe_sem_cores_usa_cores_do_catalogo():
+def test_id_do_catalogo_tem_prioridade_sobre_cores_da_equipe():
     _assert_usa_cores(
-        str(escudo_svg(Equipe("São Paulo"))),
-        persistencia.cores_do_time("São Paulo"),
+        str(escudo_svg(Equipe("X", id=1, cores=CORES_TESTE))),
+        catalogo.cores_do_time(1),
     )
 
 
-def test_cores_da_equipe_tem_prioridade_sobre_o_catalogo():
+def test_equipe_com_id_fora_do_catalogo_usa_as_proprias_cores():
+    _assert_usa_cores(
+        str(escudo_svg(Equipe("X", id=901, cores=CORES_TESTE))), CORES_TESTE
+    )
+
+
+def test_equipe_sem_id_usa_as_proprias_cores():
     _assert_usa_cores(
         str(escudo_svg(Equipe("São Paulo", cores=CORES_TESTE))), CORES_TESTE
+    )
+
+
+def test_equipe_sem_id_e_sem_cores_usa_escudo_cinza():
+    """Sem id, a `Equipe` não é mais buscada no catálogo pelo nome."""
+    _assert_usa_cores(
+        str(escudo_svg(Equipe("São Paulo"))), CORES_ESCUDO_PADRAO
+    )
+
+
+def test_id_desconhecido_usa_escudo_cinza():
+    _assert_usa_cores(str(escudo_svg(999)), CORES_ESCUDO_PADRAO)
+
+
+def test_equipe_com_id_desconhecido_e_sem_cores_usa_escudo_cinza():
+    _assert_usa_cores(
+        str(escudo_svg(Equipe("X", id=999))), CORES_ESCUDO_PADRAO
     )
 
 
@@ -111,6 +142,25 @@ def test_nome_aparece_no_rotulo_e_no_title():
     assert "<title>Escudo do São Paulo</title>" in svg
 
 
+def test_rotulo_de_id_usa_nome_do_catalogo():
+    svg = str(escudo_svg(1))
+
+    assert 'aria-label="Escudo do São Paulo"' in svg
+    assert "<title>Escudo do São Paulo</title>" in svg
+
+
+def test_rotulo_de_equipe_com_id_do_catalogo_usa_nome_do_catalogo():
+    svg = str(escudo_svg(Equipe("Qualquer", id=1)))
+
+    assert 'aria-label="Escudo do São Paulo"' in svg
+
+
+def test_rotulo_de_id_desconhecido():
+    svg = str(escudo_svg(999))
+
+    assert 'aria-label="Escudo do Time #999"' in svg
+
+
 def test_nome_com_caracteres_especiais_e_escapado():
     svg = str(escudo_svg(Equipe("<b>&</b>")))
 
@@ -156,3 +206,25 @@ def test_svg_e_xml_valido_com_faixas_verticais_na_ordem():
         assert float(faixa.get("width")) < 34
     assert xs[-1] + float(faixas[-1].get("width")) >= 100
     assert [f.get("fill") for f in faixas] == CORES_TESTE
+
+
+def test_global_nome_time_resolve_id_do_catalogo():
+    html = templates.env.from_string("{{ nome_time(1) }}").render()
+
+    assert html == "São Paulo"
+
+
+def test_global_nome_time_aceita_equipe_e_id_desconhecido():
+    html = templates.env.from_string(
+        "{{ nome_time(e) }}|{{ nome_time(999) }}"
+    ).render(e=Equipe("Time A", id=901))
+
+    assert html == "Time A|Time #999"
+
+
+def test_global_nome_time_escapa_html():
+    html = templates.env.from_string("{{ nome_time(t) }}").render(
+        t=Equipe("<b>", id=901)
+    )
+
+    assert html == "&lt;b&gt;"
