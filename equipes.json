@@ -1,7 +1,7 @@
 {
   "Copa do Brasil": [
     {
-      "id": null,
+      "id": 1,
       "nome": "São Paulo",
       "financas": 10000000,
       "fas": 100000,
@@ -14,7 +14,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 2,
       "nome": "Palmeiras",
       "financas": 10000000,
       "fas": 100000,
@@ -27,7 +27,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 3,
       "nome": "Corinthians",
       "financas": 10000000,
       "fas": 100000,
@@ -40,7 +40,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 4,
       "nome": "Santos",
       "financas": 10000000,
       "fas": 100000,
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 5,
       "nome": "Flamengo",
       "financas": 10000000,
       "fas": 100000,
@@ -66,7 +66,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 6,
       "nome": "Vasco",
       "financas": 10000000,
       "fas": 100000,
@@ -79,7 +79,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 7,
       "nome": "Botafogo",
       "financas": 10000000,
       "fas": 100000,
@@ -92,7 +92,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 8,
       "nome": "Fluminense",
       "financas": 10000000,
       "fas": 100000,
@@ -105,7 +105,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 9,
       "nome": "Grêmio",
       "financas": 10000000,
       "fas": 100000,
@@ -118,7 +118,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 10,
       "nome": "Internacional",
       "financas": 10000000,
       "fas": 100000,
@@ -131,7 +131,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 11,
       "nome": "Cruzeiro",
       "financas": 10000000,
       "fas": 100000,
@@ -144,7 +144,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 12,
       "nome": "Atlético-MG",
       "financas": 10000000,
       "fas": 100000,
@@ -157,7 +157,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 13,
       "nome": "Bahia",
       "financas": 10000000,
       "fas": 100000,
@@ -170,7 +170,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 14,
       "nome": "Vitória",
       "financas": 10000000,
       "fas": 100000,
@@ -183,7 +183,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 15,
       "nome": "Athletico-PR",
       "financas": 10000000,
       "fas": 100000,
@@ -196,7 +196,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 16,
       "nome": "Coritiba",
       "financas": 10000000,
       "fas": 100000,
@@ -211,7 +211,7 @@
   ],
   "Copa do Mundo 2026": [
     {
-      "id": null,
+      "id": 17,
       "nome": "Brasil",
       "financas": 10000000,
       "fas": 100000,
@@ -224,7 +224,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 18,
       "nome": "Argentina",
       "financas": 10000000,
       "fas": 100000,
@@ -237,7 +237,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 19,
       "nome": "Uruguai",
       "financas": 10000000,
       "fas": 100000,
@@ -250,7 +250,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 20,
       "nome": "Paraguai",
       "financas": 10000000,
       "fas": 100000,
@@ -263,7 +263,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 21,
       "nome": "França",
       "financas": 10000000,
       "fas": 100000,
@@ -276,7 +276,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 22,
       "nome": "Espanha",
       "financas": 10000000,
       "fas": 100000,
@@ -289,7 +289,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 23,
       "nome": "Alemanha",
       "financas": 10000000,
       "fas": 100000,
@@ -302,7 +302,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 24,
       "nome": "Inglaterra",
       "financas": 10000000,
       "fas": 100000,
@@ -315,7 +315,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 25,
       "nome": "Itália",
       "financas": 10000000,
       "fas": 100000,
@@ -328,7 +328,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 26,
       "nome": "Holanda",
       "financas": 10000000,
       "fas": 100000,
@@ -341,7 +341,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 27,
       "nome": "Portugal",
       "financas": 10000000,
       "fas": 100000,
@@ -354,7 +354,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 28,
       "nome": "Croácia",
       "financas": 10000000,
       "fas": 100000,
@@ -367,7 +367,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 29,
       "nome": "Marrocos",
       "financas": 10000000,
       "fas": 100000,
@@ -380,7 +380,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 30,
       "nome": "Bélgica",
       "financas": 10000000,
       "fas": 100000,
@@ -393,7 +393,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 31,
       "nome": "Noruega",
       "financas": 10000000,
       "fas": 100000,
@@ -406,7 +406,7 @@
       ]
     },
     {
-      "id": null,
+      "id": 32,
       "nome": "Suíça",
       "financas": 10000000,
       "fas": 100000,
