@@ -5,7 +5,7 @@
 {% block conteudo %}
     <h1>{{ nome_fase }}</h1>
     <p>{{ campeonato }} — Temporada {{ temporada }}</p>
-    <p>Seu time: <strong class="time">{{ escudo(time_escolhido, 20) }}{{ time_escolhido }}</strong></p>
+    <p>Seu time: <strong class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</strong></p>
 
     <table>
         <thead>
@@ -19,10 +19,10 @@
         <tbody>
         {% for time_a, time_b, vencedor, gols_a, gols_b in confrontos %}
             <tr>
-                <td><span class="time">{{ escudo(time_a, 20) }}{{ time_a }}</span></td>
+                <td><span class="time">{{ escudo(time_a, 20) }}{{ nome_time(time_a) }}</span></td>
                 <td>{{ gols_a }} x {{ gols_b }}</td>
-                <td><span class="time">{{ escudo(time_b, 20) }}{{ time_b }}</span></td>
-                <td><span class="time">{{ escudo(vencedor, 20) }}{{ vencedor }}</span></td>
+                <td><span class="time">{{ escudo(time_b, 20) }}{{ nome_time(time_b) }}</span></td>
+                <td><span class="time">{{ escudo(vencedor, 20) }}{{ nome_time(vencedor) }}</span></td>
             </tr>
         {% endfor %}
         </tbody>

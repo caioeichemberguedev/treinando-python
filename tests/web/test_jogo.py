@@ -5,6 +5,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
+import catalogo
 import persistencia
 import web.estado as estado
 from web.main import app
@@ -688,3 +689,112 @@ def test_campeao_mostra_escudo_em_destaque():
     assert f'aria-label="Escudo do {campeao}"' in resposta.text
     for cor in campeao.cores:
         assert cor in resposta.text
+
+
+# --- Nome e cores do catálogo do adm nas telas de jogo (ID-008-T8) ---
+
+NOME_NOVO_ID_1 = "Tricolor Editado"
+CORES_NOVAS_ID_1 = ["#112233", "#445566"]
+NOME_NOVO_ID_2 = "Alviverde Editado"
+CORES_NOVAS_ID_2 = ["#778899", "#AABBCC", "#DDEEFF", "#012345"]
+
+
+def _adicionar_campeonato_com_ids_do_catalogo():
+    """Acrescenta ao `equipes.json` de teste um campeonato com os ids 1 e 2
+    do catálogo (São Paulo e Palmeiras), para o jogo depender do catálogo.
+    """
+    caminho = persistencia.ARQUIVO_EQUIPES
+    with open(caminho, encoding="utf-8") as arquivo:
+        dados = json.load(arquivo)
+    dados["Campeonato Catálogo"] = [
+        {"id": 1, "nome": "São Paulo", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+        {"id": 2, "nome": "Palmeiras", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+    ]
+    with open(caminho, "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo)
+
+
+def _iniciar_jogo_e_editar_catalogo():
+    """Começa o jogo com o id 1 e só DEPOIS edita os ids 1 e 2 no catálogo
+    (o jogo em andamento foi montado com os nomes/cores antigos).
+    """
+    _adicionar_campeonato_com_ids_do_catalogo()
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Catálogo", "time": "1"})
+    catalogo.salvar_time_no_catalogo(1, NOME_NOVO_ID_1, CORES_NOVAS_ID_1)
+    catalogo.salvar_time_no_catalogo(2, NOME_NOVO_ID_2, CORES_NOVAS_ID_2)
+
+
+def _assert_mostra_nomes_e_cores_novos(html):
+    assert NOME_NOVO_ID_1 in html
+    assert NOME_NOVO_ID_2 in html
+    assert "São Paulo" not in html
+    assert "Palmeiras" not in html
+    for cor in CORES_NOVAS_ID_1 + CORES_NOVAS_ID_2:
+        assert cor in html
+
+
+def test_escolher_time_mostra_o_nome_editado_no_catalogo():
+    _adicionar_campeonato_com_ids_do_catalogo()
+    catalogo.salvar_time_no_catalogo(1, NOME_NOVO_ID_1, CORES_NOVAS_ID_1)
+
+    resposta = client.post("/novo-jogo", data={"campeonato": "Campeonato Catálogo"})
+
+    assert resposta.status_code == 200
+    assert NOME_NOVO_ID_1 in resposta.text
+    assert "São Paulo" not in resposta.text
+    assert "Palmeiras" in resposta.text
+
+
+def test_penaltis_mostra_nome_e_cores_editados_com_jogo_em_andamento():
+    _iniciar_jogo_e_editar_catalogo()
+
+    resposta = client.get("/fase/penaltis")
+
+    assert resposta.status_code == 200
+    _assert_mostra_nomes_e_cores_novos(resposta.text)
+
+
+def test_fase_mostra_nome_e_cores_editados_com_jogo_em_andamento():
+    _iniciar_jogo_e_editar_catalogo()
+
+    resposta = _passar_pela_fase_atual()
+
+    assert "Seu time: <strong class=\"time\">" in resposta.text
+    _assert_mostra_nomes_e_cores_novos(resposta.text)
+
+
+def test_campeao_mostra_nome_e_cores_editados_com_jogo_em_andamento():
+    _iniciar_jogo_e_editar_catalogo()
+    _passar_pela_fase_atual()
+    client.post("/fase/avancar")
+
+    resposta = client.get("/campeao")
+
+    assert resposta.status_code == 200
+    campeao = estado.obter_jogo().campeao
+    nome_novo, cores_novas = {
+        1: (NOME_NOVO_ID_1, CORES_NOVAS_ID_1),
+        2: (NOME_NOVO_ID_2, CORES_NOVAS_ID_2),
+    }[campeao.id]
+    destaque = resposta.text.split('class="destaque"')[1].split("</p>")[0]
+    assert nome_novo in destaque
+    assert f'aria-label="Escudo do {nome_novo}"' in destaque
+    for cor in cores_novas:
+        assert cor in destaque
+    assert "São Paulo" not in resposta.text
+    assert "Palmeiras" not in resposta.text
+
+
+def test_telas_de_jogo_com_times_de_teste_seguem_com_o_nome_do_equipes_json():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
+
+    penaltis = client.get("/fase/penaltis")
+    _resolver_disputa_penaltis_ate_o_fim()
+    fase = client.get("/fase")
+    client.post("/fase/avancar")
+    campeao = client.get("/campeao")
+
+    for html in (penaltis.text, fase.text):
+        assert ">Time A</span>" in html
+        assert ">Time B</span>" in html
+    assert re.search(r">Time [AB]</span>", campeao.text)

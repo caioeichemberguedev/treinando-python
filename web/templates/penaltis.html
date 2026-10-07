@@ -6,9 +6,9 @@
     <h1>Disputa de pênaltis</h1>
     <p>{{ campeonato }} — Temporada {{ temporada }}</p>
     <p>
-        <span class="time">{{ escudo(time_escolhido, 40) }}{{ time_escolhido }}</span>
+        <span class="time">{{ escudo(time_escolhido, 40) }}{{ nome_time(time_escolhido) }}</span>
         x
-        <span class="time">{{ escudo(adversario, 40) }}{{ adversario }}</span>
+        <span class="time">{{ escudo(adversario, 40) }}{{ nome_time(adversario) }}</span>
     </p>
 
     <table>
@@ -21,12 +21,12 @@
         </thead>
         <tbody>
             <tr>
-                <td><span class="time">{{ escudo(time_escolhido, 20) }}{{ time_escolhido }}</span></td>
+                <td><span class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</span></td>
                 <td>{{ gols_jogador }}</td>
                 <td>{{ sequencia_jogador|join(" ") }}</td>
             </tr>
             <tr>
-                <td><span class="time">{{ escudo(adversario, 20) }}{{ adversario }}</span></td>
+                <td><span class="time">{{ escudo(adversario, 20) }}{{ nome_time(adversario) }}</span></td>
                 <td>{{ gols_adversario }}</td>
                 <td>{{ sequencia_adversario|join(" ") }}</td>
             </tr>

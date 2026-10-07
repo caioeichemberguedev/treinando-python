@@ -4,7 +4,7 @@
 
 {% block conteudo %}
     <h1>🏆 Campeão da {{ campeonato }} {{ temporada }}</h1>
-    <p class="destaque"><span class="time">{{ escudo(campeao, 96) }}{{ campeao }}</span></p>
+    <p class="destaque"><span class="time">{{ escudo(campeao, 96) }}{{ nome_time(campeao) }}</span></p>
 
     {% if jogador_foi_campeao %}
         <p>🎉 PARABÉNS! Você foi campeão!</p>
