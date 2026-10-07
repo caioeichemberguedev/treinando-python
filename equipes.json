@@ -1,38 +1,390 @@
 {
   "Copa do Brasil": [
-    "São Paulo",
-    "Palmeiras",
-    "Corinthians",
-    "Santos",
-    "Flamengo",
-    "Vasco",
-    "Botafogo",
-    "Fluminense",
-    "Grêmio",
-    "Internacional",
-    "Cruzeiro",
-    "Atlético-MG",
-    "Bahia",
-    "Vitória",
-    "Athletico-PR",
-    "Coritiba"
+    {
+      "nome": "São Paulo",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#E30613",
+        "#FFFFFF",
+        "#000000"
+      ]
+    },
+    {
+      "nome": "Palmeiras",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#006437",
+        "#FFFFFF",
+        "#006437"
+      ]
+    },
+    {
+      "nome": "Corinthians",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#FFFFFF",
+        "#000000"
+      ]
+    },
+    {
+      "nome": "Santos",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#FFFFFF",
+        "#000000",
+        "#FFFFFF"
+      ]
+    },
+    {
+      "nome": "Flamengo",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#C4161C",
+        "#000000",
+        "#C4161C"
+      ]
+    },
+    {
+      "nome": "Vasco",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#FFFFFF",
+        "#E30613"
+      ]
+    },
+    {
+      "nome": "Botafogo",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#FFFFFF",
+        "#000000"
+      ]
+    },
+    {
+      "nome": "Fluminense",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#870A28",
+        "#FFFFFF",
+        "#00613C"
+      ]
+    },
+    {
+      "nome": "Grêmio",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#0D80BF",
+        "#000000",
+        "#FFFFFF"
+      ]
+    },
+    {
+      "nome": "Internacional",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#E5050F",
+        "#FFFFFF",
+        "#E5050F"
+      ]
+    },
+    {
+      "nome": "Cruzeiro",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#2F529E",
+        "#FFFFFF",
+        "#2F529E"
+      ]
+    },
+    {
+      "nome": "Atlético-MG",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#FFFFFF",
+        "#000000"
+      ]
+    },
+    {
+      "nome": "Bahia",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#006CB5",
+        "#FFFFFF",
+        "#ED3237"
+      ]
+    },
+    {
+      "nome": "Vitória",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#E30613",
+        "#000000",
+        "#E30613"
+      ]
+    },
+    {
+      "nome": "Athletico-PR",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#C8102E",
+        "#000000",
+        "#C8102E"
+      ]
+    },
+    {
+      "nome": "Coritiba",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#00573F",
+        "#FFFFFF",
+        "#00573F"
+      ]
+    }
   ],
   "Copa do Mundo 2026": [
-    "Brasil",
-    "Argentina",
-    "Uruguai",
-    "Paraguai",
-    "França",
-    "Espanha",
-    "Alemanha",
-    "Inglaterra",
-    "Itália",
-    "Holanda",
-    "Portugal",
-    "Croácia",
-    "Marrocos",
-    "Bélgica",
-    "Noruega",
-    "Suíça"
+    {
+      "nome": "Brasil",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#009C3B",
+        "#FFDF00",
+        "#002776"
+      ]
+    },
+    {
+      "nome": "Argentina",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#75AADB",
+        "#FFFFFF",
+        "#75AADB"
+      ]
+    },
+    {
+      "nome": "Uruguai",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#55B5E5",
+        "#FFFFFF",
+        "#000000"
+      ]
+    },
+    {
+      "nome": "Paraguai",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#D52B1E",
+        "#FFFFFF",
+        "#0038A8"
+      ]
+    },
+    {
+      "nome": "França",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#002395",
+        "#FFFFFF",
+        "#ED2939"
+      ]
+    },
+    {
+      "nome": "Espanha",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#AA151B",
+        "#F1BF00",
+        "#AA151B"
+      ]
+    },
+    {
+      "nome": "Alemanha",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#DD0000",
+        "#FFCE00"
+      ]
+    },
+    {
+      "nome": "Inglaterra",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#FFFFFF",
+        "#CE1124",
+        "#FFFFFF"
+      ]
+    },
+    {
+      "nome": "Itália",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#009246",
+        "#FFFFFF",
+        "#CE2B37"
+      ]
+    },
+    {
+      "nome": "Holanda",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#F36C21",
+        "#FFFFFF",
+        "#21468B"
+      ]
+    },
+    {
+      "nome": "Portugal",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#006600",
+        "#DA291C",
+        "#FFCC00"
+      ]
+    },
+    {
+      "nome": "Croácia",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#FF0000",
+        "#FFFFFF",
+        "#171796"
+      ]
+    },
+    {
+      "nome": "Marrocos",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#C1272D",
+        "#006233",
+        "#C1272D"
+      ]
+    },
+    {
+      "nome": "Bélgica",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#000000",
+        "#FDDA24",
+        "#EF3340"
+      ]
+    },
+    {
+      "nome": "Noruega",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#BA0C2F",
+        "#FFFFFF",
+        "#00205B"
+      ]
+    },
+    {
+      "nome": "Suíça",
+      "financas": 10000000,
+      "fas": 100000,
+      "titulos": 0,
+      "forca": 50,
+      "cores": [
+        "#DA291C",
+        "#FFFFFF",
+        "#DA291C"
+      ]
+    }
   ]
 }

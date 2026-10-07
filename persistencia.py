@@ -8,64 +8,89 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
 DIR_SAVES = os.path.join(BASE_DIR, "saves")
 
+# Fonte da verdade do elenco padrão: nome de cada time + as 3 cores do
+# escudo (hex). Times de 2 cores repetem uma. O `equipes.json` é regenerado
+# a partir daqui por `restaurar_equipes_padrao()`.
 EQUIPES_PADRAO = {
-    "Copa do Brasil": [
-        "São Paulo",
-        "Palmeiras",
-        "Corinthians",
-        "Santos",
-        "Flamengo",
-        "Vasco",
-        "Botafogo",
-        "Fluminense",
-        "Grêmio",
-        "Internacional",
-        "Cruzeiro",
-        "Atlético-MG",
-        "Bahia",
-        "Vitória",
-        "Athletico-PR",
-        "Coritiba",
-    ],
-    "Copa do Mundo 2026": [
-        "Brasil",
-        "Argentina",
-        "Uruguai",
-        "Paraguai",
-        "França",
-        "Espanha",
-        "Alemanha",
-        "Inglaterra",
-        "Itália",
-        "Holanda",
-        "Portugal",
-        "Croácia",
-        "Marrocos",
-        "Bélgica",
-        "Noruega",
-        "Suíça",
-    ],
+    "Copa do Brasil": {
+        "São Paulo": ["#E30613", "#FFFFFF", "#000000"],
+        "Palmeiras": ["#006437", "#FFFFFF", "#006437"],
+        "Corinthians": ["#000000", "#FFFFFF", "#000000"],
+        "Santos": ["#FFFFFF", "#000000", "#FFFFFF"],
+        "Flamengo": ["#C4161C", "#000000", "#C4161C"],
+        "Vasco": ["#000000", "#FFFFFF", "#E30613"],
+        "Botafogo": ["#000000", "#FFFFFF", "#000000"],
+        "Fluminense": ["#870A28", "#FFFFFF", "#00613C"],
+        "Grêmio": ["#0D80BF", "#000000", "#FFFFFF"],
+        "Internacional": ["#E5050F", "#FFFFFF", "#E5050F"],
+        "Cruzeiro": ["#2F529E", "#FFFFFF", "#2F529E"],
+        "Atlético-MG": ["#000000", "#FFFFFF", "#000000"],
+        "Bahia": ["#006CB5", "#FFFFFF", "#ED3237"],
+        "Vitória": ["#E30613", "#000000", "#E30613"],
+        "Athletico-PR": ["#C8102E", "#000000", "#C8102E"],
+        "Coritiba": ["#00573F", "#FFFFFF", "#00573F"],
+    },
+    "Copa do Mundo 2026": {
+        "Brasil": ["#009C3B", "#FFDF00", "#002776"],
+        "Argentina": ["#75AADB", "#FFFFFF", "#75AADB"],
+        "Uruguai": ["#55B5E5", "#FFFFFF", "#000000"],
+        "Paraguai": ["#D52B1E", "#FFFFFF", "#0038A8"],
+        "França": ["#002395", "#FFFFFF", "#ED2939"],
+        "Espanha": ["#AA151B", "#F1BF00", "#AA151B"],
+        "Alemanha": ["#000000", "#DD0000", "#FFCE00"],
+        "Inglaterra": ["#FFFFFF", "#CE1124", "#FFFFFF"],
+        "Itália": ["#009246", "#FFFFFF", "#CE2B37"],
+        "Holanda": ["#F36C21", "#FFFFFF", "#21468B"],
+        "Portugal": ["#006600", "#DA291C", "#FFCC00"],
+        "Croácia": ["#FF0000", "#FFFFFF", "#171796"],
+        "Marrocos": ["#C1272D", "#006233", "#C1272D"],
+        "Bélgica": ["#000000", "#FDDA24", "#EF3340"],
+        "Noruega": ["#BA0C2F", "#FFFFFF", "#00205B"],
+        "Suíça": ["#DA291C", "#FFFFFF", "#DA291C"],
+    },
 }
+
+
+def cores_do_time(nome):
+    """Devolve uma cópia das 3 cores do time no elenco padrão, procurando o
+    nome em todos os campeonatos, ou None se o time não estiver cadastrado.
+    Aceita `Equipe` ou string.
+    """
+    nome = str(nome)
+    for times in EQUIPES_PADRAO.values():
+        if nome in times:
+            return list(times[nome])
+    return None
 
 
 def carregar_equipes():
     if os.path.exists(ARQUIVO_EQUIPES):
         with open(ARQUIVO_EQUIPES, "r", encoding="utf-8") as arquivo:
             dados = json.load(arquivo)
-        return {
+        equipes = {
             campeonato: [Equipe.from_dict(time_dados) for time_dados in times]
             for campeonato, times in dados.items()
         }
+        # `equipes.json` antigo (sem `cores`): completa só em memória com o
+        # catálogo do elenco padrão, sem regravar o arquivo.
+        for times in equipes.values():
+            for equipe in times:
+                if equipe.cores is None:
+                    equipe.cores = cores_do_time(equipe.nome)
+        return equipes
 
     return restaurar_equipes_padrao()
 
 
 def restaurar_equipes_padrao():
-    """Recria o elenco (finanças, fãs, força e títulos) com os valores
+    """Recria o elenco (finanças, fãs, força, títulos e cores) com os valores
     iniciais padrão e sobrescreve o `equipes.json`. Não afeta um jogo salvo
     em andamento, que mantém sua própria cópia dos times.
     """
-    equipes = {campeonato: [Equipe(nome) for nome in nomes] for campeonato, nomes in EQUIPES_PADRAO.items()}
+    equipes = {
+        campeonato: [Equipe(nome, cores=cores) for nome, cores in times.items()]
+        for campeonato, times in EQUIPES_PADRAO.items()
+    }
     salvar_equipes(equipes)
     return equipes
 

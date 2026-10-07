@@ -218,8 +218,8 @@ def test_confirmar_restauracao_mostra_tela_de_confirmacao_sem_restaurar(equipes_
 def _assert_equipes_iguais_ao_padrao(arquivo):
     dados = _ler_equipes_salvas(arquivo)
     esperado = {
-        campeonato: [Equipe(nome).to_dict() for nome in nomes]
-        for campeonato, nomes in persistencia.EQUIPES_PADRAO.items()
+        campeonato: [Equipe(nome, cores=cores).to_dict() for nome, cores in times.items()]
+        for campeonato, times in persistencia.EQUIPES_PADRAO.items()
     }
     assert dados == esperado
 
