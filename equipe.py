@@ -1,5 +1,10 @@
 class Equipe:
-    """Uma equipe do jogo: nome + atributos de carreira (finanças, fãs, títulos).
+    """Uma equipe do jogo: nome + atributos de carreira (finanças, fãs,
+    títulos, força) + cores do escudo.
+
+    `cores` é uma lista com as 3 cores principais do time (hex, ex.:
+    "#E30613") ou None quando o time não tem cores cadastradas (ex.: save
+    antigo); nesse caso a interface usa um escudo padrão.
 
     Se comporta como uma string (__str__/__format__/__len__/__eq__/__hash__)
     para poder ser usada nos mesmos lugares que hoje esperam o nome do time
@@ -18,12 +23,15 @@ class Equipe:
     PREMIO_TITULO = 5_000_000
     FAS_POR_TITULO = 50_000
 
-    def __init__(self, nome, financas=None, fas=None, titulos=0, forca=None):
+    def __init__(
+        self, nome, financas=None, fas=None, titulos=0, forca=None, cores=None
+    ):
         self.nome = nome
         self.financas = financas if financas is not None else self.FINANCAS_INICIAL
         self.fas = fas if fas is not None else self.FAS_INICIAL
         self.titulos = titulos
         self.forca = forca if forca is not None else self.FORCA_INICIAL
+        self.cores = list(cores) if cores is not None else None
 
     def registrar_vitoria(self):
         self.financas += self.PREMIO_VITORIA
@@ -44,6 +52,7 @@ class Equipe:
             "fas": self.fas,
             "titulos": self.titulos,
             "forca": self.forca,
+            "cores": self.cores,
         }
 
     @classmethod
@@ -56,6 +65,7 @@ class Equipe:
             dados.get("fas"),
             dados.get("titulos", 0),
             dados.get("forca"),
+            dados.get("cores"),
         )
 
     def __str__(self):
@@ -64,7 +74,8 @@ class Equipe:
     def __repr__(self):
         return (
             f"Equipe({self.nome!r}, financas={self.financas}, fas={self.fas}, "
-            f"titulos={self.titulos}, forca={self.forca})"
+            f"titulos={self.titulos}, forca={self.forca}, "
+            f"cores={self.cores!r})"
         )
 
     def __format__(self, format_spec):
