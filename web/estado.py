@@ -33,8 +33,11 @@ class EstadoJogo:
 
     `historico` guarda as temporadas já concluídas desta carreira, no mesmo
     formato usado por `persistencia`/`menu.py`: uma lista de dicts
-    `{"temporada", "campeao", "fases"}`. Vazio num jogo novo; copiado do save
-    quando uma carreira existente é carregada.
+    `{"temporada", "campeao", "fases"}` que identifica os times pelo `id`
+    (`campeao` é o id do campeão; cada fase vem de
+    `campeonato.registro_da_fase`, com confrontos `[id_a, id_b, id_vencedor,
+    gols_a, gols_b]`). Nome/escudo são resolvidos só na exibição. Vazio num
+    jogo novo; copiado do save quando uma carreira existente é carregada.
 
     `times_do_campeonato` guarda o roster completo do campeonato capturado no
     início da carreira — os MESMOS objetos `Equipe` (por identidade) usados em

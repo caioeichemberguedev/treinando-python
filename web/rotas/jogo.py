@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from campeonato import montar_confrontos_fase, sortear_classificados
+from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classificados
 from penaltis import CANTOS, cobranca_time_a, cobranca_time_b, criar_disputa
 from persistencia import carregar_equipes
 from web.estado import EstadoJogo, iniciar_jogo, obter_jogo
@@ -40,16 +40,18 @@ def escolher_campeonato(request: Request, campeonato: Annotated[str, Form()]):
 
 
 @router.post("/novo-jogo/time")
-def escolher_time(campeonato: Annotated[str, Form()], time: Annotated[str, Form()]):
-    """Recebe o time escolhido, inicializa o jogo em memória (temporada 2026,
-    classificados embaralhados) e segue pra fase atual.
+def escolher_time(campeonato: Annotated[str, Form()], time: Annotated[int, Form()]):
+    """Recebe o time escolhido (pelo `id`, não pelo nome), inicializa o jogo
+    em memória (temporada 2026, classificados embaralhados) e segue pra fase
+    atual. Id fora do campeonato → 404; valor não numérico → 422 (validação
+    do próprio FastAPI).
     """
     equipes = carregar_equipes()
     times = equipes.get(campeonato)
     if times is None:
         raise HTTPException(status_code=404, detail="Campeonato não encontrado.")
 
-    time_escolhido = next((equipe for equipe in times if equipe == time), None)
+    time_escolhido = next((equipe for equipe in times if equipe.id == time), None)
     if time_escolhido is None:
         raise HTTPException(status_code=404, detail="Time não encontrado nesse campeonato.")
 
@@ -265,6 +267,10 @@ def avancar_fase():
     """Fecha a fase atual e monta a próxima: se sobrar 1 classificado, marca
     o campeão da temporada e segue pra `GET /campeao`; senão, volta pra
     `GET /fase` já com os novos classificados.
+
+    `fases_da_temporada` continua com objetos `Equipe` (exibição), mas o que
+    vai para `jogo.historico` usa ids (`registro_da_fase` e `campeao.id`) —
+    mesmo formato do save do terminal.
     """
     jogo = obter_jogo()
     if jogo is None or jogo.fase_atual is None:
@@ -286,9 +292,8 @@ def avancar_fase():
         campeao = proximos[0]
         campeao.sagrar_campea()
         jogo.campeao = campeao
-        jogo.historico.append(
-            {"temporada": jogo.temporada, "campeao": campeao, "fases": jogo.fases_da_temporada}
-        )
+        fases = [registro_da_fase(fase["nome_fase"], fase["confrontos"]) for fase in jogo.fases_da_temporada]
+        jogo.historico.append({"temporada": jogo.temporada, "campeao": campeao.id, "fases": fases})
         return RedirectResponse(url="/campeao", status_code=303)
 
     return RedirectResponse(url="/fase", status_code=303)

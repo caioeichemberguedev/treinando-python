@@ -11,7 +11,7 @@
         {% for time in times %}
             <li>
                 <label>
-                    <input type="radio" name="time" value="{{ time.nome }}" required>
+                    <input type="radio" name="time" value="{{ time.id }}" required>
                     <span class="time">{{ escudo(time, 40) }}{{ time.nome }}</span>
                     (💰 R$ {{ "{:,}".format(time.financas) }} | 👥 {{ "{:,}".format(time.fas) }} fãs |
                     ⚡ {{ time.forca }}/100 | 🏆 {{ time.titulos }})

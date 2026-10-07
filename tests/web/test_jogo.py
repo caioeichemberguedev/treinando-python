@@ -48,18 +48,18 @@ def equipes_de_teste(tmp_path, monkeypatch):
     """
     dados = {
         "Campeonato Teste": [
-            {"nome": "Time A", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Time B", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 901, "nome": "Time A", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 902, "nome": "Time B", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
         ],
         "Outro Campeonato": [
-            {"nome": "Time C", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Time D", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 903, "nome": "Time C", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 904, "nome": "Time D", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
         ],
         "Copa Teste": [
-            {"nome": "Copa E", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Copa F", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Copa G", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
-            {"nome": "Copa H", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 905, "nome": "Copa E", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 906, "nome": "Copa F", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 907, "nome": "Copa G", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
+            {"id": 908, "nome": "Copa H", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50},
         ],
     }
     arquivo = tmp_path / "equipes.json"
@@ -95,7 +95,7 @@ def test_escolher_campeonato_inexistente_retorna_404():
 def test_escolher_time_valido_redireciona_e_preenche_o_estado():
     resposta = client.post(
         "/novo-jogo/time",
-        data={"campeonato": "Campeonato Teste", "time": "Time A"},
+        data={"campeonato": "Campeonato Teste", "time": "901"},
         follow_redirects=False,
     )
 
@@ -105,7 +105,8 @@ def test_escolher_time_valido_redireciona_e_preenche_o_estado():
     jogo = estado.obter_jogo()
     assert jogo is not None
     assert jogo.campeonato == "Campeonato Teste"
-    assert jogo.time_escolhido == "Time A"
+    assert jogo.time_escolhido.id == 901
+    assert jogo.time_escolhido.nome == "Time A"
     assert jogo.temporada == 2026
     assert {str(time) for time in jogo.classificados} == {"Time A", "Time B"}
 
@@ -113,10 +114,38 @@ def test_escolher_time_valido_redireciona_e_preenche_o_estado():
 def test_escolher_time_inexistente_retorna_404():
     resposta = client.post(
         "/novo-jogo/time",
-        data={"campeonato": "Campeonato Teste", "time": "Time Fantasma"},
+        data={"campeonato": "Campeonato Teste", "time": "999"},
     )
 
     assert resposta.status_code == 404
+
+
+def test_escolher_time_de_outro_campeonato_retorna_404():
+    resposta = client.post(
+        "/novo-jogo/time",
+        data={"campeonato": "Campeonato Teste", "time": "903"},
+    )
+
+    assert resposta.status_code == 404
+
+
+@pytest.mark.parametrize("valor", ["abc", "Time A", ""])
+def test_escolher_time_com_id_nao_numerico_nunca_da_500(valor):
+    resposta = client.post(
+        "/novo-jogo/time",
+        data={"campeonato": "Campeonato Teste", "time": valor},
+    )
+
+    assert resposta.status_code in (404, 422)
+    assert estado.obter_jogo() is None
+
+
+def test_escolher_campeonato_usa_o_id_como_valor_do_radio():
+    resposta = client.post("/novo-jogo", data={"campeonato": "Campeonato Teste"})
+
+    assert 'value="901"' in resposta.text
+    assert 'value="902"' in resposta.text
+    assert 'value="Time A"' not in resposta.text
 
 
 def test_fase_sem_jogo_em_andamento_retorna_404():
@@ -141,7 +170,7 @@ def test_fase_com_confronto_do_jogador_redireciona_para_penaltis():
     """Enquanto o confronto do jogador não foi decidido, GET /fase não
     exibe a fase — redireciona pra /fase/penaltis.
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
 
     resposta = client.get("/fase", follow_redirects=False)
 
@@ -150,7 +179,7 @@ def test_fase_com_confronto_do_jogador_redireciona_para_penaltis():
 
 
 def test_tela_penaltis_mostra_o_placar_e_pede_a_escolha_do_jogador():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
 
     resposta = client.get("/fase/penaltis")
 
@@ -170,7 +199,7 @@ def _iniciar_disputa_de_teste():
     """Começa um jogo com 2 times e abre a disputa de pênaltis do jogador.
     Retorna o estado da disputa (`jogo.disputa_penaltis["estado"]`).
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     client.get("/fase/penaltis")
     return estado.obter_jogo().disputa_penaltis["estado"]
 
@@ -345,7 +374,7 @@ def test_avancar_fase_com_confronto_pendente_retorna_400():
     """Não dá pra avançar de fase com o confronto do jogador ainda em
     aberto — precisa passar pela disputa de pênaltis primeiro.
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     client.get("/fase")  # monta a fase (confronto_pendente ainda não decidido)
 
     resposta = client.post("/fase/avancar")
@@ -354,7 +383,7 @@ def test_avancar_fase_com_confronto_pendente_retorna_400():
 
 
 def test_fase_mostra_o_nome_da_fase_e_os_confrontos():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
 
     resposta = _passar_pela_fase_atual()
 
@@ -368,7 +397,7 @@ def test_fase_repetida_nao_recalcula_o_resultado():
     confronto do jogador decidido, tem que mostrar sempre o mesmo resultado
     já fechado, sem sortear de novo a cada request.
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
 
     primeira = client.get("/fase")
@@ -390,7 +419,7 @@ def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
     sempre defende o adversário) e a disputa termina sem completar as 5
     rodadas, sem depender de qual lado do par o jogador caiu.
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     client.get("/fase/penaltis")  # garante que a disputa foi criada antes do monkeypatch
 
     valores = iter([1, 2, 1, 1] * 3)
@@ -408,16 +437,16 @@ def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
 
     jogo = estado.obter_jogo()
     time_a, time_b, vencedor, gols_a, gols_b = jogo.fase_atual["confrontos"][0]
-    assert vencedor == "Time A"
+    assert vencedor.id == 901
     assert vencedor.titulos == 0  # título só é contado no campeão da temporada
-    if time_a == "Time A":
+    if time_a.id == 901:
         assert (gols_a, gols_b) == (3, 0)
     else:
         assert (gols_a, gols_b) == (0, 3)
 
 
 def test_fluxo_completo_ate_o_campeao_com_dois_times():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
 
     resposta_fase = _passar_pela_fase_atual()
     assert resposta_fase.status_code == 200
@@ -432,14 +461,14 @@ def test_fluxo_completo_ate_o_campeao_com_dois_times():
     assert "Time A" in resposta_campeao.text or "Time B" in resposta_campeao.text
 
     jogo = estado.obter_jogo()
-    assert jogo.campeao in ("Time A", "Time B")
+    assert jogo.campeao.id in (901, 902)
     assert jogo.campeao.titulos == 1
 
 
 def test_fluxo_completo_ate_o_campeao_com_quatro_times():
-    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "Copa E"})
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
 
-    times_esperados = {"Copa E", "Copa F", "Copa G", "Copa H"}
+    ids_esperados = {905, 906, 907, 908}
     rodadas = 0
 
     while True:
@@ -461,19 +490,47 @@ def test_fluxo_completo_ate_o_campeao_com_quatro_times():
     assert "Campeão" in resposta_campeao.text
 
     jogo = estado.obter_jogo()
-    assert jogo.campeao in times_esperados
+    assert jogo.campeao.id in ids_esperados
     assert rodadas == 2
 
 
 def test_campeao_acumula_a_temporada_concluida_no_historico():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
     client.post("/fase/avancar")
 
     jogo = estado.obter_jogo()
     assert len(jogo.historico) == 1
     assert jogo.historico[0]["temporada"] == 2026
-    assert jogo.historico[0]["campeao"] == jogo.campeao
+    assert jogo.historico[0]["campeao"] == jogo.campeao.id
+
+
+def test_historico_da_temporada_guarda_ids_e_nao_objetos_equipe():
+    """Com 4 times (2 fases), o histórico gravado ao chegar em /campeao usa
+    o formato de ids do save: campeão `int` e confrontos `[int, int, int,
+    int, int]` — enquanto `fases_da_temporada` segue com objetos `Equipe`.
+    """
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
+    while True:
+        _passar_pela_fase_atual()
+        resposta = client.post("/fase/avancar", follow_redirects=False)
+        if resposta.headers["location"] == "/campeao":
+            break
+
+    jogo = estado.obter_jogo()
+    registro = jogo.historico[-1]
+    assert type(registro["campeao"]) is int
+    assert registro["campeao"] == jogo.campeao.id
+    assert len(registro["fases"]) == 2
+    ids_validos = {905, 906, 907, 908}
+    for fase, fase_original in zip(registro["fases"], jogo.fases_da_temporada):
+        assert fase["nome_fase"] == fase_original["nome_fase"]
+        for confronto in fase["confrontos"]:
+            assert isinstance(confronto, list)
+            assert len(confronto) == 5
+            assert all(type(valor) is int for valor in confronto)
+            assert set(confronto[:3]) <= ids_validos
+    assert json.loads(json.dumps(jogo.historico)) == jogo.historico
 
 
 def test_continuar_para_proxima_temporada_sem_campeao_definido_retorna_404():
@@ -483,7 +540,7 @@ def test_continuar_para_proxima_temporada_sem_campeao_definido_retorna_404():
 
 
 def test_continuar_para_proxima_temporada_reinicia_o_ciclo():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
     client.post("/fase/avancar")
 
@@ -510,7 +567,7 @@ def test_continuar_para_proxima_temporada_preserva_a_progressao_das_equipes():
     (`jogo.times_do_campeonato`) precisa ser reaproveitado por identidade, e
     não recarregado do zero a partir de `equipes.json`.
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
     client.post("/fase/avancar")
 
@@ -528,7 +585,7 @@ def test_continuar_para_proxima_temporada_preserva_a_progressao_das_equipes():
 
 
 def test_completar_duas_temporadas_acumula_dois_itens_no_historico():
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
     client.post("/fase/avancar")
     client.post("/campeao/continuar")
@@ -583,7 +640,7 @@ def test_escolher_time_mostra_as_cores_do_time():
 
 
 def test_fase_mostra_escudos_do_seu_time_e_de_cada_confronto():
-    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "Copa E"})
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
 
     resposta = _passar_pela_fase_atual()
 
@@ -595,7 +652,7 @@ def test_fase_mostra_escudos_do_seu_time_e_de_cada_confronto():
 
 def test_fase_mostra_as_cores_dos_times():
     _dar_cores_aos_times_de_teste()
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
 
     resposta = _passar_pela_fase_atual()
 
@@ -619,7 +676,7 @@ def test_penaltis_mostra_escudo_do_jogador_e_do_adversario():
 
 def test_campeao_mostra_escudo_em_destaque():
     _dar_cores_aos_times_de_teste()
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "Time A"})
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
     client.post("/fase/avancar")
 
