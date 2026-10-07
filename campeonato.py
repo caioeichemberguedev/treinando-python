@@ -166,6 +166,25 @@ def montar_confrontos_fase(classificados, time_escolhido=None, campeonato=""):
     return nome_fase, confrontos_resolvidos, confronto_pendente, proximos_parciais
 
 
+def registro_da_fase(nome_fase, confrontos):
+    """Monta o registro de uma fase para o histórico, identificando cada
+    time pelo `id` (e não pelo objeto `Equipe` nem pelo nome).
+
+    `confrontos` é a lista de tuplas (time_a, time_b, vencedor, gols_a,
+    gols_b) produzida por `gerar_rodadas`/`montar_confrontos_fase`. Retorna
+    `{"nome_fase": nome_fase, "confrontos": [[id_a, id_b, id_vencedor,
+    gols_a, gols_b], ...]}` — com listas (não tuplas), que é o formato
+    gravado no JSON. Não altera a lista recebida.
+    """
+    return {
+        "nome_fase": nome_fase,
+        "confrontos": [
+            [time_a.id, time_b.id, vencedor.id, gols_a, gols_b]
+            for time_a, time_b, vencedor, gols_a, gols_b in confrontos
+        ],
+    }
+
+
 def montar_classificacao(fases):
     """Reconstrói, a partir das fases de uma temporada, em que rodada cada
     time foi eliminado (campeão e vice tratados à parte, na final).
