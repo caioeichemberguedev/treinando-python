@@ -140,7 +140,48 @@ def test_repr_inclui_id():
     assert "id=None" in repr(Equipe("X"))
 
 
-def test_id_nao_muda_a_comparacao_por_nome_ainda():
-    """Nesta etapa a igualdade continua pelo nome (a troca é na ID-007-T8)."""
-    assert Equipe("X", id=1) == Equipe("X", id=2)
-    assert Equipe("X", id=1) == "X"
+def test_mesmo_id_e_igual_mesmo_com_nomes_diferentes():
+    assert Equipe("A", id=1) == Equipe("B", id=1)
+
+
+def test_ids_diferentes_sao_diferentes_mesmo_com_o_mesmo_nome():
+    assert Equipe("A", id=1) != Equipe("A", id=2)
+
+
+def test_equipe_nao_e_igual_a_string_nem_a_int():
+    equipe = Equipe("A", id=1)
+
+    assert (equipe == "A") is False
+    assert (equipe == 1) is False
+    assert equipe != "A"
+
+
+def test_equipes_sem_id_so_sao_iguais_a_si_mesmas():
+    primeira = Equipe("A")
+    segunda = Equipe("A")
+
+    assert primeira != segunda
+    assert primeira == primeira
+    assert segunda == segunda
+
+
+def test_equipe_com_id_e_diferente_de_equipe_sem_id():
+    assert Equipe("A", id=1) != Equipe("A")
+
+
+def test_set_agrupa_equipes_pelo_id():
+    assert len({Equipe("A", id=1), Equipe("B", id=1)}) == 1
+
+
+def test_hash_igual_para_equipes_iguais():
+    assert hash(Equipe("A", id=1)) == hash(Equipe("B", id=1))
+
+
+def test_set_com_equipes_sem_id_mantem_as_duas():
+    assert len({Equipe("A"), Equipe("A")}) == 2
+
+
+def test_equipe_sem_id_funciona_como_chave_de_dict():
+    equipe = Equipe("A")
+
+    assert {equipe: 1}[equipe] == 1

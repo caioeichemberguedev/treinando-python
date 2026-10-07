@@ -14,17 +14,6 @@ DIR_SAVES = os.path.join(BASE_DIR, "saves")
 VERSAO_SAVE = 2
 
 
-def cores_do_time(nome):
-    """Devolve uma cópia das 3 cores do time do catálogo com esse nome, ou
-    None se o time não estiver cadastrado. Aceita `Equipe` ou string.
-
-    Compatibilidade: o catálogo agora é indexado por id
-    (`catalogo.cores_do_time`); esta versão por nome ainda é usada por
-    `web/escudo.py` e sai quando ele passar a usar o id.
-    """
-    return catalogo.cores_do_time(catalogo.id_do_time_por_nome(str(nome)))
-
-
 def carregar_equipes():
     if os.path.exists(ARQUIVO_EQUIPES):
         with open(ARQUIVO_EQUIPES, "r", encoding="utf-8") as arquivo:

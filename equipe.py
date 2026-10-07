@@ -11,10 +11,13 @@ class Equipe:
     somente leitura (`equipe.id = 5` levanta `AttributeError`) e fica None
     quando o time não tem id cadastrado (ex.: save antigo, times de teste).
 
-    Se comporta como uma string (__str__/__format__/__len__/__eq__/__hash__)
-    para poder ser usada nos mesmos lugares que hoje esperam o nome do time
-    (chaveamento, placar, comparações), sem precisar espalhar `.nome` por
-    todo o código.
+    Para exibição, se comporta como o nome (__str__/__format__/__len__), o
+    que permite usá-la direto em f-strings e no placar alinhado do terminal.
+
+    Igualdade e hash são pelo `id`, e só entre `Equipe`s: duas equipes com o
+    mesmo id são iguais mesmo com nomes diferentes; comparar com `str`/`int`
+    dá False. Equipes sem id (None) só são iguais a si mesmas (mesmo
+    objeto), para dois times "sem id" nunca serem iguais por acaso.
     """
 
     FINANCAS_INICIAL = 10_000_000
@@ -105,11 +108,13 @@ class Equipe:
         return len(self.nome)
 
     def __eq__(self, outro):
-        if isinstance(outro, Equipe):
-            return self.nome == outro.nome
-        if isinstance(outro, str):
-            return self.nome == outro
-        return NotImplemented
+        if not isinstance(outro, Equipe):
+            return NotImplemented
+        if self.id is None or outro.id is None:
+            return self is outro
+        return self.id == outro.id
 
     def __hash__(self):
-        return hash(self.nome)
+        if self.id is None:
+            return object.__hash__(self)
+        return hash(self.id)

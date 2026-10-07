@@ -38,8 +38,9 @@ def test_duas_chamadas_geram_ids_de_clip_diferentes():
     assert _id_clip(primeiro) != _id_clip(segundo)
 
 
-def test_string_crua_usa_cores_do_catalogo():
-    _assert_usa_cores(str(escudo_svg("São Paulo")), catalogo.cores_do_time(1))
+def test_string_crua_nao_busca_cores_no_catalogo():
+    """String é só texto: mesmo com nome de time do catálogo, escudo cinza."""
+    _assert_usa_cores(str(escudo_svg("São Paulo")), CORES_ESCUDO_PADRAO)
 
 
 def test_id_do_catalogo_usa_cores_do_catalogo():

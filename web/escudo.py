@@ -4,7 +4,7 @@ cor do time, recortadas no formato de escudo.
 Registrado como global `escudo` do Jinja2 em `web/templates_config.py`:
 `{{ escudo(time) }}` ou `{{ escudo(campeao, 96) }}` nos templates. `time`
 pode ser uma `Equipe`, o id do time (`int`, formato do histórico), uma
-string crua ou None.
+string crua (só texto: escudo cinza) ou None.
 """
 
 import itertools
@@ -56,8 +56,8 @@ def _cores_validas(cores):
 
 def _resolver_cores(time):
     """Escolhe as cores do escudo, nesta ordem: id conhecido no catálogo →
-    `Equipe.cores` válidas → string crua buscada no catálogo pelo nome
-    (compatibilidade temporária) → cinza padrão.
+    `Equipe.cores` válidas → cinza padrão. String crua não é buscada no
+    catálogo (time é identificado só pelo id): vira escudo cinza.
     """
     id_time = _id_do_time(time)
     if id_time is not None:
@@ -67,11 +67,6 @@ def _resolver_cores(time):
 
     if isinstance(time, Equipe) and _cores_validas(time.cores):
         return list(time.cores)
-
-    if isinstance(time, str) and time:
-        cores = catalogo.cores_do_time(catalogo.id_do_time_por_nome(time))
-        if cores is not None and _cores_validas(cores):
-            return cores
 
     return list(CORES_ESCUDO_PADRAO)
 

@@ -19,23 +19,9 @@ def arquivo_equipes(tmp_path, monkeypatch):
     return arquivo
 
 
-def test_cores_do_time_por_nome():
-    assert persistencia.cores_do_time("São Paulo") == ["#E30613", "#FFFFFF", "#000000"]
-
-
-def test_cores_do_time_aceita_equipe():
-    assert persistencia.cores_do_time(Equipe("Brasil")) == ["#009C3B", "#FFDF00", "#002776"]
-
-
-def test_cores_do_time_desconhecido_retorna_none():
-    assert persistencia.cores_do_time("Time Fantasma") is None
-
-
-def test_alterar_lista_devolvida_nao_altera_o_padrao():
-    cores = persistencia.cores_do_time("São Paulo")
-    cores[0] = "#123456"
-
-    assert catalogo.cores_do_time(1)[0] == "#E30613"
+def test_persistencia_nao_expoe_mais_cores_do_time_por_nome():
+    """As cores vêm só do catálogo, pelo id (`catalogo.cores_do_time`)."""
+    assert not hasattr(persistencia, "cores_do_time")
 
 
 def _padrao_por_campeonato():

@@ -47,7 +47,9 @@ def test_montar_confrontos_fase_sem_time_escolhido_resolve_tudo():
     assert len(confrontos_resolvidos) == 2
     assert len(proximos_parciais) == 2
 
-    pares_resolvidos = {(time_a, time_b) for time_a, time_b, _, _, _ in confrontos_resolvidos}
+    pares_resolvidos = {
+        (time_a.nome, time_b.nome) for time_a, time_b, _, _, _ in confrontos_resolvidos
+    }
     assert pares_resolvidos == {("A", "B"), ("C", "D")}
 
     for time_a, time_b, vencedor, gols_a, gols_b in confrontos_resolvidos:
@@ -63,7 +65,7 @@ def test_montar_confrontos_fase_com_time_escolhido_deixa_so_seu_par_pendente():
     classificados = [time_a, time_b, time_c, time_d]
 
     nome_fase, confrontos_resolvidos, confronto_pendente, proximos_parciais = (
-        montar_confrontos_fase(classificados, time_escolhido="B")
+        montar_confrontos_fase(classificados, time_escolhido=time_b)
     )
 
     assert nome_fase == "Semifinal"
