@@ -261,6 +261,49 @@ def test_editar_e_restaurar_nao_afetam_jogo_em_andamento():
     assert time_a.fas == Equipe("Time A").fas
 
 
+def test_tela_equipes_campeonato_mostra_um_escudo_por_time():
+    resposta = client.get("/equipes/Campeonato Teste")
+
+    assert resposta.status_code == 200
+    assert resposta.text.count('class="escudo"') == 2
+    assert 'aria-label="Escudo do Time A"' in resposta.text
+    assert 'aria-label="Escudo do Time B"' in resposta.text
+
+
+def test_tela_editar_equipe_mostra_o_escudo_do_time():
+    resposta = client.get("/equipes/Campeonato Teste/Time A/editar")
+
+    assert resposta.status_code == 200
+    assert resposta.text.count('class="escudo"') == 1
+    assert 'aria-label="Escudo do Time A"' in resposta.text
+
+
+def test_tela_editar_equipe_nao_tem_campo_de_cor():
+    resposta = client.get("/equipes/Campeonato Teste/Time A/editar")
+
+    assert resposta.status_code == 200
+    assert 'type="color"' not in resposta.text
+    assert 'name="cores"' not in resposta.text
+
+
+def test_editar_equipe_nao_altera_as_cores_salvas(equipes_de_teste):
+    cores = ["#111111", "#222222", "#333333"]
+    dados = _ler_equipes_salvas(equipes_de_teste)
+    dados["Campeonato Teste"][0]["cores"] = cores
+    equipes_de_teste.write_text(json.dumps(dados), encoding="utf-8")
+
+    resposta = client.post(
+        "/equipes/Campeonato Teste/Time A/editar",
+        data={"financas": "2500000", "fas": "75000", "forca": "88", "cores": "#FFFFFF"},
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 303
+    time_a = _equipe_salva(equipes_de_teste, "Campeonato Teste", "Time A")
+    assert time_a["forca"] == 88
+    assert time_a["cores"] == cores
+
+
 @pytest.mark.parametrize("valor", ["²", "³", "①"])
 def test_editar_equipe_com_digito_unicode_nao_numerico_retorna_400_e_nao_500(equipes_de_teste, valor):
     """`str.isdigit()` aceita caracteres como "²" que `int()` não converte —

@@ -3,7 +3,7 @@
 {% block titulo %}Editar {{ equipe.nome }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Editar {{ equipe.nome }}</h1>
+    <h1><span class="time">{{ escudo(equipe, 40) }}Editar {{ equipe.nome }}</span></h1>
 
     {% if edicao_bloqueada %}
         <p><strong>{{ mensagem_bloqueio }}</strong></p>
