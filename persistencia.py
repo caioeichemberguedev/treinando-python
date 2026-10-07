@@ -19,7 +19,10 @@ def carregar_equipes():
         with open(ARQUIVO_EQUIPES, "r", encoding="utf-8") as arquivo:
             dados = json.load(arquivo)
         return {
-            campeonato: [_completar_com_catalogo(Equipe.from_dict(time_dados)) for time_dados in times]
+            campeonato: [
+                _aplicar_catalogo(_completar_com_catalogo(Equipe.from_dict(time_dados)))
+                for time_dados in times
+            ]
             for campeonato, times in dados.items()
         }
 
@@ -37,6 +40,19 @@ def _completar_com_catalogo(equipe):
         dados["id"] = catalogo.id_do_time_por_nome(equipe.nome)
         equipe = Equipe.from_dict(dados)
     if equipe.cores is None:
+        equipe.cores = catalogo.cores_do_time(equipe.id)
+    return equipe
+
+
+def _aplicar_catalogo(equipe):
+    """Troca `nome`/`cores` da equipe pelos do catálogo efetivo (com as
+    edições do adm), se o id dela for conhecido. O catálogo é a fonte da
+    verdade; o que está no arquivo é só um retrato salvo. Só em memória:
+    nenhum arquivo é regravado. Id desconhecido/None → equipe intacta.
+    """
+    nome = catalogo.nome_do_time(equipe.id)
+    if nome is not None:
+        equipe.nome = nome
         equipe.cores = catalogo.cores_do_time(equipe.id)
     return equipe
 
@@ -130,7 +146,9 @@ def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados,
 
 def carregar_jogo_salvo(nome_save):
     """Lê uma carreira salva específica e já reconstrói `time_escolhido`/
-    `classificados` como objetos `Equipe`. Retorna None se não existir.
+    `classificados` como objetos `Equipe`, com nome/cores do catálogo
+    efetivo (edições do adm valem também para carreiras em andamento).
+    Retorna None se não existir.
     """
     caminho = _caminho_save(nome_save)
     if not os.path.exists(caminho):
@@ -139,9 +157,11 @@ def carregar_jogo_salvo(nome_save):
     with open(caminho, "r", encoding="utf-8") as arquivo:
         dados = json.load(arquivo)
 
-    dados["time_escolhido"] = Equipe.from_dict(dados["time_escolhido"])
+    dados["time_escolhido"] = _aplicar_catalogo(Equipe.from_dict(dados["time_escolhido"]))
     if dados["classificados"] is not None:
-        dados["classificados"] = [Equipe.from_dict(item) for item in dados["classificados"]]
+        dados["classificados"] = [
+            _aplicar_catalogo(Equipe.from_dict(item)) for item in dados["classificados"]
+        ]
 
     return dados
 

@@ -141,3 +141,73 @@ def test_listar_saves_ignora_save_antigo_e_json_corrompido(dir_saves):
     # Nada é apagado: os arquivos ignorados continuam no disco.
     assert os.path.exists(dir_saves / "2_01_01_2026.json")
     assert os.path.exists(dir_saves / "3_01_01_2026.json")
+
+
+# --- Catálogo do adm aplicado ao carregar (ID-008-T3) ---------------------
+
+
+def _renomear_sao_paulo():
+    catalogo.salvar_time_no_catalogo(1, "SPFC", ["#FF0000", "#000000"])
+
+
+def test_carregar_equipes_aplica_nome_e_cores_do_adm_sem_regravar(arquivo_equipes):
+    persistencia.restaurar_equipes_padrao()
+    conteudo_antes = arquivo_equipes.read_text(encoding="utf-8")
+    _renomear_sao_paulo()
+
+    equipes = persistencia.carregar_equipes()
+
+    sao_paulo = next(equipe for equipe in equipes["Copa do Brasil"] if equipe.id == 1)
+    assert sao_paulo.nome == "SPFC"
+    assert sao_paulo.cores == ["#FF0000", "#000000"]
+    palmeiras = next(equipe for equipe in equipes["Copa do Brasil"] if equipe.id == 2)
+    assert palmeiras.nome == "Palmeiras"
+    # Só em memória: o equipes.json continua com o nome antigo.
+    assert arquivo_equipes.read_text(encoding="utf-8") == conteudo_antes
+    nomes_no_arquivo = [time["nome"] for time in json.loads(conteudo_antes)["Copa do Brasil"]]
+    assert "São Paulo" in nomes_no_arquivo
+
+
+def test_carregar_equipes_mantem_time_com_id_desconhecido(arquivo_equipes):
+    conteudo = json.dumps(
+        {"Copa do Brasil": [{"id": 901, "nome": "Time Fantasma", "cores": ["#111111"]}]},
+        ensure_ascii=False,
+    )
+    arquivo_equipes.write_text(conteudo, encoding="utf-8")
+    _renomear_sao_paulo()
+
+    (time,) = persistencia.carregar_equipes()["Copa do Brasil"]
+
+    assert (time.id, time.nome, time.cores) == (901, "Time Fantasma", ["#111111"])
+
+
+def test_carregar_jogo_salvo_aplica_catalogo_do_adm(dir_saves):
+    sao_paulo = Equipe("São Paulo", financas=123, cores=["#E30613", "#FFFFFF", "#000000"], id=1)
+    fantasma = Equipe("Time Fantasma", cores=["#111111"], id=901)
+    persistencia.salvar_jogo("1_01_01_2026", "Copa do Brasil", sao_paulo, 2026, [sao_paulo, fantasma])
+    caminho = dir_saves / "1_01_01_2026.json"
+    conteudo_antes = caminho.read_text(encoding="utf-8")
+    _renomear_sao_paulo()
+
+    dados = persistencia.carregar_jogo_salvo("1_01_01_2026")
+
+    escolhido = dados["time_escolhido"]
+    assert (escolhido.id, escolhido.nome, escolhido.cores) == (1, "SPFC", ["#FF0000", "#000000"])
+    assert escolhido.financas == 123  # os demais campos vêm do save
+    classificado_sp, classificado_fantasma = dados["classificados"]
+    assert (classificado_sp.nome, classificado_sp.cores) == ("SPFC", ["#FF0000", "#000000"])
+    assert (classificado_fantasma.id, classificado_fantasma.nome, classificado_fantasma.cores) == (
+        901, "Time Fantasma", ["#111111"],
+    )
+    # Só em memória: o save não é regravado.
+    assert caminho.read_text(encoding="utf-8") == conteudo_antes
+
+
+def test_carregar_jogo_salvo_com_classificados_none(dir_saves):
+    persistencia.salvar_jogo("1_01_01_2026", "Copa do Brasil", Equipe("São Paulo", id=1), 2026, None)
+    _renomear_sao_paulo()
+
+    dados = persistencia.carregar_jogo_salvo("1_01_01_2026")
+
+    assert dados["time_escolhido"].nome == "SPFC"
+    assert dados["classificados"] is None
