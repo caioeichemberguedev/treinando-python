@@ -4,6 +4,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+import catalogo
 import persistencia
 import web.estado as estado
 from equipe import Equipe
@@ -181,3 +182,18 @@ def test_tela_saves_save_antigo_sem_cores_usa_cores_do_catalogo():
     assert resposta.status_code == 200
     assert resposta.text.count('class="escudo"') == 1
     assert "#E30613" in resposta.text
+
+
+def test_tela_saves_mostra_nome_do_catalogo_do_adm():
+    """O save guarda o retrato antigo ("São Paulo"), mas a tela resolve o
+    nome pelo id no catálogo editado pelo adm."""
+    catalogo.salvar_time_no_catalogo(1, "Nome Adm", ["#FF0000"])
+    _criar_save("1_01_01_2026", time_escolhido=Equipe("São Paulo", id=1))
+    _criar_save("2_01_01_2026")
+
+    resposta = client.get("/saves")
+
+    assert resposta.status_code == 200
+    assert "Nome Adm" in resposta.text
+    assert "São Paulo" not in resposta.text
+    assert "Time A" in resposta.text

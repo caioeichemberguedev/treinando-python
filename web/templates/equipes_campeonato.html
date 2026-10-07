@@ -21,7 +21,7 @@
         <tbody>
         {% for time in times %}
             <tr>
-                <td><span class="time">{{ escudo(time, 20) }}{{ time.nome }}</span></td>
+                <td><span class="time">{{ escudo(time, 20) }}{{ nome_time(time) }}</span></td>
                 <td>R$ {{ "{:,}".format(time.financas) }}</td>
                 <td>{{ "{:,}".format(time.fas) }}</td>
                 <td>{{ time.forca }}/100</td>

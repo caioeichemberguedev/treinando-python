@@ -23,7 +23,7 @@
             {% for save in saves %}
                 <tr>
                     <td>{{ save.nome }}</td>
-                    <td><span class="time">{{ escudo(save.time_escolhido, 20) }}{{ save.time_escolhido }}</span></td>
+                    <td><span class="time">{{ escudo(save.time_escolhido, 20) }}{{ nome_time(save.time_escolhido) }}</span></td>
                     <td>{{ save.campeonato }}</td>
                     <td>{{ save.temporada }}</td>
                     <td>

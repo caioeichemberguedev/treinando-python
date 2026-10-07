@@ -387,3 +387,46 @@ def test_editar_equipe_com_digito_unicode_nao_numerico_retorna_400_e_nao_500(equ
 
     time_a = _equipe_salva(equipes_de_teste, "Campeonato Teste", 901)
     assert time_a["financas"] == 1_000_000
+
+
+def _equipes_com_time_renomeado_pelo_adm(arquivo):
+    """`equipes.json` de teste com o time de id 1 ainda chamado "São Paulo",
+    enquanto o catálogo do adm (isolado pelo conftest) o renomeia."""
+    dados = _ler_equipes_salvas(arquivo)
+    dados["Campeonato Teste"].append(
+        {"id": 1, "nome": "São Paulo", "financas": 1_000_000, "fas": 1_000, "titulos": 0, "forca": 50}
+    )
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    catalogo.salvar_time_no_catalogo(1, "Nome Adm", ["#FF0000"])
+
+
+def test_tela_equipes_campeonato_mostra_nome_do_catalogo_do_adm(equipes_de_teste):
+    _equipes_com_time_renomeado_pelo_adm(equipes_de_teste)
+
+    resposta = client.get("/equipes/Campeonato Teste")
+
+    assert resposta.status_code == 200
+    assert "Nome Adm" in resposta.text
+    assert "São Paulo" not in resposta.text
+    assert "Time A" in resposta.text
+    assert "Time B" in resposta.text
+
+
+def test_tela_editar_equipe_mostra_nome_do_catalogo_do_adm(equipes_de_teste):
+    _equipes_com_time_renomeado_pelo_adm(equipes_de_teste)
+
+    resposta = client.get("/equipes/Campeonato Teste/1/editar")
+
+    assert resposta.status_code == 200
+    assert "<title>Editar Nome Adm" in resposta.text
+    assert "Nome Adm" in resposta.text
+    assert "São Paulo" not in resposta.text
+
+
+def test_tela_editar_equipe_de_teste_mantem_nome_do_equipes_json(equipes_de_teste):
+    _equipes_com_time_renomeado_pelo_adm(equipes_de_teste)
+
+    resposta = client.get("/equipes/Campeonato Teste/901/editar")
+
+    assert resposta.status_code == 200
+    assert "Editar Time A" in resposta.text

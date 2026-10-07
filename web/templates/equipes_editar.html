@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block titulo %}Editar {{ equipe.nome }} — Jogo de Futebol{% endblock %}
+{% block titulo %}Editar {{ nome_time(equipe) }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1><span class="time">{{ escudo(equipe, 40) }}Editar {{ equipe.nome }}</span></h1>
+    <h1><span class="time">{{ escudo(equipe, 40) }}Editar {{ nome_time(equipe) }}</span></h1>
 
     <p>{{ aviso }}</p>
 
