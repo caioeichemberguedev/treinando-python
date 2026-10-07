@@ -627,7 +627,7 @@ def test_escolher_time_mostra_um_escudo_grande_por_time():
 
     assert resposta.status_code == 200
     assert _contar_escudos(resposta.text) == 4
-    assert resposta.text.count('width="40"') == 4
+    assert resposta.text.count('height="40"') == 4
 
 
 def test_escolher_time_mostra_as_cores_do_time():
@@ -683,7 +683,7 @@ def test_campeao_mostra_escudo_em_destaque():
     resposta = client.get("/campeao")
 
     assert resposta.status_code == 200
-    assert 'width="96"' in resposta.text
+    assert 'height="96"' in resposta.text
     campeao = estado.obter_jogo().campeao
     assert f'aria-label="Escudo do {campeao}"' in resposta.text
     for cor in campeao.cores:

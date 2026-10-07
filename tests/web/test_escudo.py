@@ -1,5 +1,8 @@
+import itertools
 import re
+import xml.etree.ElementTree as ET
 
+import pytest
 from markupsafe import Markup
 
 import catalogo
@@ -8,15 +11,23 @@ from web.escudo import CORES_ESCUDO_PADRAO, escudo_svg
 from web.templates_config import templates
 
 CORES_TESTE = ["#111111", "#222222", "#333333"]
+NS = "{http://www.w3.org/2000/svg}"
 
 
 def _id_clip(svg):
     return re.search(r'<clipPath id="([^"]+)"', svg).group(1)
 
 
+def _faixas(svg):
+    """As faixas coloridas: `<rect>` dentro do grupo recortado (fora o
+    recorte do clipPath e a borda)."""
+    raiz = ET.fromstring(svg)  # levanta ParseError se o SVG for inválido
+    grupo = raiz.find(f"{NS}g")
+    return grupo.findall(f"{NS}rect")
+
+
 def _assert_usa_cores(svg, cores):
-    fills = re.findall(r'<rect [^>]*fill="([^"]+)"', svg)
-    assert fills == cores
+    assert [f.get("fill") for f in _faixas(svg)] == cores
 
 
 def test_escudo_com_cores_tem_estrutura_completa():
@@ -25,7 +36,7 @@ def test_escudo_com_cores_tem_estrutura_completa():
     assert "<svg" in svg
     assert 'class="escudo"' in svg
     assert "<clipPath" in svg
-    assert svg.count("<rect") == 3
+    assert len(_faixas(svg)) == 3
     for cor in CORES_TESTE:
         assert cor in svg
     assert f'clip-path="url(#{_id_clip(svg)})"' in svg
@@ -116,24 +127,123 @@ def test_cor_invalida_usa_escudo_cinza():
         assert "<script>" not in svg
 
 
-def test_quantidade_errada_de_cores_usa_escudo_cinza():
-    svg = str(escudo_svg(Equipe("X", cores=["#111111", "#222222"])))
+@pytest.mark.parametrize("cores", [[], ["#111111"] * 5])
+def test_quantidade_errada_de_cores_usa_escudo_cinza(cores):
+    svg = str(escudo_svg(Equipe("X", cores=cores)))
 
     _assert_usa_cores(svg, CORES_ESCUDO_PADRAO)
 
 
-def test_tamanho_define_largura_e_altura():
-    svg = str(escudo_svg(Equipe("X", cores=CORES_TESTE), 96))
-
-    assert 'width="96"' in svg
-    assert f'height="{round(96 * 1.2)}"' in svg
+def test_escudo_padrao_tem_dois_tons_de_cinza():
+    assert len(CORES_ESCUDO_PADRAO) == 2
+    _assert_usa_cores(str(escudo_svg(None)), CORES_ESCUDO_PADRAO)
 
 
-def test_tamanho_padrao_e_24():
-    svg = str(escudo_svg(Equipe("X", cores=CORES_TESTE)))
+@pytest.mark.parametrize("quantidade", [1, 2, 3, 4])
+def test_n_cores_geram_n_faixas_iguais_na_ordem(quantidade):
+    cores = ["#111111", "#222222", "#333333", "#444444"][:quantidade]
+    svg = str(escudo_svg(Equipe("X", id=901, cores=cores)))
 
-    assert 'width="24"' in svg
-    assert f'height="{round(24 * 1.2)}"' in svg
+    faixas = _faixas(svg)
+    assert [f.get("fill") for f in faixas] == cores
+    larguras = [float(f.get("width")) for f in faixas]
+    assert len(set(larguras)) == 1
+    assert sum(larguras) == pytest.approx(50, abs=0.001)
+    xs = [float(f.get("x")) for f in faixas]
+    assert xs == pytest.approx(
+        [i * 50 / quantidade for i in range(quantidade)], abs=0.001
+    )
+    for faixa in faixas:
+        assert float(faixa.get("y")) == 0
+        assert float(faixa.get("height")) == 100
+
+
+def test_tamanho_e_a_altura_e_largura_e_a_metade():
+    raiz = ET.fromstring(str(escudo_svg(Equipe("X", cores=CORES_TESTE), 96)))
+
+    assert raiz.get("height") == "96"
+    assert raiz.get("width") == "48"
+    assert raiz.get("viewBox") == "0 0 50 100"
+
+
+def test_tamanho_padrao_e_24_de_altura():
+    raiz = ET.fromstring(str(escudo_svg(Equipe("X", cores=CORES_TESTE))))
+
+    assert raiz.get("height") == "24"
+    assert raiz.get("width") == "12"
+
+
+def test_recorte_e_retangulo_com_cantos_arredondados():
+    raiz = ET.fromstring(str(escudo_svg(Equipe("X", cores=CORES_TESTE))))
+
+    recorte = raiz.find(f".//{NS}clipPath/{NS}rect")
+    assert recorte is not None
+    assert float(recorte.get("rx")) > 0
+    assert float(recorte.get("width")) == 50
+    assert float(recorte.get("height")) == 100
+
+
+def test_corinthians_tem_duas_faixas_preta_e_branca():
+    _assert_usa_cores(str(escudo_svg(3)), ["#000000", "#FFFFFF"])
+
+
+@pytest.mark.parametrize(
+    "cores_catalogo", [["#111111"] * 5, ["#111111", "red"], []]
+)
+def test_cores_invalidas_no_catalogo_usam_escudo_cinza(
+    monkeypatch, cores_catalogo
+):
+    monkeypatch.setattr(catalogo, "cores_do_time", lambda _id: cores_catalogo)
+
+    _assert_usa_cores(
+        str(escudo_svg(Equipe("X", id=1, cores=CORES_TESTE))),
+        CORES_ESCUDO_PADRAO,
+    )
+
+
+def test_cores_explicitas_ignoram_o_catalogo():
+    svg = str(escudo_svg(1, cores=["#123456"]))
+
+    _assert_usa_cores(svg, ["#123456"])
+    assert 'aria-label="Escudo do São Paulo"' in svg
+
+
+def test_rotulo_da_previa_usa_nome_efetivo_do_catalogo():
+    catalogo.salvar_time_no_catalogo(1, "Nome Adm", ["#FF0000"])
+
+    svg = str(escudo_svg(1, cores=["#123456"]))
+
+    assert 'aria-label="Escudo do Nome Adm"' in svg
+    _assert_usa_cores(svg, ["#123456"])
+
+
+def test_escudo_por_id_usa_cores_editadas_pelo_adm():
+    catalogo.salvar_time_no_catalogo(1, "Nome Adm", ["#FF0000", "#00FF00"])
+
+    _assert_usa_cores(str(escudo_svg(1)), ["#FF0000", "#00FF00"])
+
+
+@pytest.mark.parametrize(
+    "cores",
+    [[], ["#111111"] * 5, ["red"], ["#FFF"], ['"><script>'], "#111111"],
+)
+def test_cores_explicitas_invalidas_usam_escudo_cinza(cores):
+    svg = str(escudo_svg(1, cores=cores))
+
+    _assert_usa_cores(svg, CORES_ESCUDO_PADRAO)
+    assert "<script>" not in svg
+
+
+def test_ids_de_clip_unicos_em_varios_escudos():
+    svgs = [
+        str(escudo_svg(t))
+        for t in itertools.islice(itertools.cycle([1, 3, None, "X"]), 20)
+    ]
+
+    ids = [_id_clip(svg) for svg in svgs]
+    assert len(set(ids)) == len(ids)
+    for svg, id_clip in zip(svgs, ids):
+        assert f'clip-path="url(#{id_clip})"' in svg
 
 
 def test_nome_aparece_no_rotulo_e_no_title():
@@ -185,28 +295,25 @@ def test_global_do_jinja_renderiza_svg_sem_escape():
 def test_global_do_jinja_aceita_tamanho():
     html = templates.env.from_string("{{ escudo(t, 96) }}").render(t="Brasil")
 
-    assert 'width="96"' in html
+    assert 'height="96"' in html
+    assert 'width="48"' in html
 
 
-def test_svg_e_xml_valido_com_faixas_verticais_na_ordem():
-    import xml.etree.ElementTree as ET
+def test_global_do_jinja_aceita_cores_da_previa():
+    html = templates.env.from_string(
+        "{{ escudo(1, 96, cores=c) }}"
+    ).render(c=["#123456", "#654321"])
 
-    ns = "{http://www.w3.org/2000/svg}"
+    _assert_usa_cores(html, ["#123456", "#654321"])
+
+
+def test_svg_e_xml_valido_com_nome_escapado():
     svg = str(escudo_svg(Equipe("<b>&</b>", cores=CORES_TESTE), 48))
 
     raiz = ET.fromstring(svg)  # levanta ParseError se o SVG for inválido
-    assert raiz.tag == f"{ns}svg"
+    assert raiz.tag == f"{NS}svg"
     assert raiz.get("aria-label") == "Escudo do <b>&</b>"
-
-    faixas = raiz.findall(f".//{ns}rect")
-    xs = [float(f.get("x")) for f in faixas]
-    assert xs == sorted(xs) and xs[0] == 0
-    for faixa in faixas:
-        assert float(faixa.get("y")) == 0
-        assert float(faixa.get("height")) == 120
-        assert float(faixa.get("width")) < 34
-    assert xs[-1] + float(faixas[-1].get("width")) >= 100
-    assert [f.get("fill") for f in faixas] == CORES_TESTE
+    _assert_usa_cores(svg, CORES_TESTE)
 
 
 def test_global_nome_time_resolve_id_do_catalogo():
