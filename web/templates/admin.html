@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block titulo %}Área adm — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Área adm: times</h1>
+
+    <form method="post" action="{{ url_for('sair_admin') }}">
+        <button type="submit" class="botao">Sair</button>
+    </form>
+
+    {% for campeonato, ids in campeonatos.items() %}
+        <h2>{{ campeonato }}</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Nome e cores</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for id_time in ids %}
+                <tr>
+                    <td><span class="time">{{ escudo(id_time, 40) }}{{ nome_time(id_time) }}</span></td>
+                    <td><a href="/admin/times/{{ id_time }}" class="botao">Editar</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+{% endblock %}

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
-from web.rotas import equipes, historico, jogo, saves
+from web.rotas import admin, equipes, historico, jogo, saves
 from web.templates_config import templates
 
 BASE = Path(__file__).parent
@@ -19,6 +19,7 @@ app.include_router(jogo.router)
 app.include_router(equipes.router)
 app.include_router(saves.router)
 app.include_router(historico.router)
+app.include_router(admin.router)
 
 
 @app.get("/")
