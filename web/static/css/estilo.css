@@ -73,3 +73,22 @@ th, td {
     font-weight: bold;
     color: var(--cor-destaque);
 }
+
+/* Escudo do time (SVG inline gerado por web/escudo.py) */
+.escudo {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+    flex-shrink: 0;
+}
+
+/* Escudo + nome do time lado a lado */
+.time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.time .escudo {
+    margin-right: 0;
+}
