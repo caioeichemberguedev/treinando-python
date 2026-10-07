@@ -1,7 +1,6 @@
 import os
 
 from cores import COR_TXT
-from equipe import Equipe
 from campeonato import gerar_rodadas, exibir_rodada, montar_classificacao, sortear_classificados
 from persistencia import (
     carregar_equipes,
@@ -267,42 +266,11 @@ def editar_equipes(equipes):
                     f"{indice} - {equipe.nome} "
                     f"(💰 R$ {equipe.financas:,} | 👥 {equipe.fas:,} fãs | ⚡ {equipe.forca}/100 | 🏆 {equipe.titulos})"
                 )
-            print("\na - Adicionar equipe")
-            print("r - Remover equipe")
-            print("n - Renomear equipe")
-            print("e - Editar finanças/fãs/força")
+            print("\ne - Editar finanças/fãs/força")
             print("v - Voltar")
             opcao = input("> ").strip().lower()
 
-            if opcao == "a":
-                nome_novo = input("Nome da nova equipe: ").strip()
-                if not nome_novo:
-                    print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
-                elif nome_novo in times:
-                    print(COR_TXT.ERRO, "Essa equipe já existe.", COR_TXT.NORMAL)
-                else:
-                    times.append(Equipe(nome_novo))
-                    salvar_equipes(equipes)
-            elif opcao == "r":
-                if not times:
-                    print(COR_TXT.ERRO, "Não há equipes para remover.", COR_TXT.NORMAL)
-                else:
-                    indice = escolher_numero("Número da equipe a remover: ", 1, len(times))
-                    removida = times.pop(indice - 1)
-                    salvar_equipes(equipes)
-                    print(f"Equipe '{removida.nome}' removida.")
-            elif opcao == "n":
-                if not times:
-                    print(COR_TXT.ERRO, "Não há equipes para renomear.", COR_TXT.NORMAL)
-                else:
-                    indice = escolher_numero("Número da equipe a renomear: ", 1, len(times))
-                    nome_novo = input("Novo nome: ").strip()
-                    if nome_novo:
-                        times[indice - 1].nome = nome_novo
-                        salvar_equipes(equipes)
-                    else:
-                        print(COR_TXT.ERRO, "Nome vazio não é permitido.", COR_TXT.NORMAL)
-            elif opcao == "e":
+            if opcao == "e":
                 if listar_saves():
                     print(
                         COR_TXT.ERRO,
