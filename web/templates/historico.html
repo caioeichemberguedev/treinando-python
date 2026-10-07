@@ -22,7 +22,7 @@
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td>{{ temporada_info.temporada }}</td>
-                    <td>{{ temporada_info.campeao }}</td>
+                    <td><span class="time">{{ escudo(temporada_info.campeao, 20) }}{{ temporada_info.campeao }}</span></td>
                     <td>
                         <a href="{{ url_for('tela_historico_jogos', indice=loop.index) }}">Jogos</a>
                         |

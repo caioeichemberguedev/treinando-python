@@ -5,10 +5,19 @@ from fastapi.testclient import TestClient
 
 import web.estado as estado
 from equipe import Equipe
+from web.escudo import CORES_ESCUDO_PADRAO
 from web.main import app
 from web.rotas import equipes, historico, jogo, saves
 
 client = TestClient(app)
+
+_SVG_OU_SPAN_TIME = re.compile(r'<svg class="escudo".*?</svg>|<span class="time">|</span>', re.S)
+
+
+def _sem_escudo(texto):
+    """Remove os SVGs de escudo e o `<span class="time">` em volta do nome,
+    para os testes de conteúdo continuarem comparando só os nomes."""
+    return _SVG_OU_SPAN_TIME.sub("", texto)
 
 
 @pytest.fixture(autouse=True)
@@ -210,7 +219,7 @@ def test_classificacao_mostra_grupos_de_montar_classificacao():
     resposta = client.get("/historico/1/classificacao")
 
     assert resposta.status_code == 200
-    texto = resposta.text
+    texto = _sem_escudo(resposta.text)
     assert "2026" in texto
     assert re.search(r"<td>Campeão</td>\s*<td>Time A</td>", texto)
     assert re.search(r"<td>Vice-campeão</td>\s*<td>Time D</td>", texto)
@@ -220,7 +229,7 @@ def test_classificacao_mostra_grupos_de_montar_classificacao():
 def test_classificacao_respeita_o_indice_escolhido():
     _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
 
-    texto = client.get("/historico/2/classificacao").text
+    texto = _sem_escudo(client.get("/historico/2/classificacao").text)
 
     assert re.search(r"<td>Campeão</td>\s*<td>Time C</td>", texto)
     assert re.search(r"<td>Vice-campeão</td>\s*<td>Time B</td>", texto)
@@ -232,7 +241,7 @@ def test_campeoes_lista_campeao_de_cada_temporada():
     resposta = client.get("/campeoes")
 
     assert resposta.status_code == 200
-    texto = resposta.text
+    texto = _sem_escudo(resposta.text)
     assert re.search(r"<td>2026</td>\s*<td>Time A</td>", texto)
     assert re.search(r"<td>2027</td>\s*<td>Time C</td>", texto)
     assert re.search(r"<td>2028</td>\s*<td>Time A</td>", texto)
@@ -241,7 +250,7 @@ def test_campeoes_lista_campeao_de_cada_temporada():
 def test_campeoes_conta_titulos_por_time_normalizando_pelo_nome():
     _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
 
-    texto = client.get("/campeoes").text
+    texto = _sem_escudo(client.get("/campeoes").text)
     contagem = re.findall(r"<td>(Time \w)</td>\s*<td>(\d+)</td>", texto)
 
     assert contagem == [("Time A", "2"), ("Time C", "1")]
@@ -328,7 +337,7 @@ def test_campeoes_empate_mantem_ordem_da_primeira_conquista():
     ]
     _iniciar_jogo_com_historico(historico)
 
-    texto = client.get("/campeoes").text
+    texto = _sem_escudo(client.get("/campeoes").text)
     contagem = re.findall(r"<td>(Time \w)</td>\s*<td>(\d+)</td>", texto)
 
     assert contagem == [("Time Z", "1"), ("Time A", "1")]
@@ -337,7 +346,7 @@ def test_campeoes_empate_mantem_ordem_da_primeira_conquista():
 def test_classificacao_com_campeao_vindo_do_json_como_lista():
     _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
 
-    texto = client.get("/historico/3/classificacao").text
+    texto = _sem_escudo(client.get("/historico/3/classificacao").text)
 
     assert re.search(r"<td>Campeão</td>\s*<td>Time A</td>", texto)
     assert re.search(r"<td>Vice-campeão</td>\s*<td>Time D</td>", texto)
@@ -353,3 +362,113 @@ def test_leitura_das_telas_novas_nao_altera_historico():
 
     assert len(estado.obter_jogo().historico) == 3
     assert estado.obter_jogo().historico[0]["campeao"] == "Time A"
+
+
+# --- ID-005-T6: escudo nas telas de histórico -----------------------------
+
+
+def _contar_escudos(texto):
+    return texto.count('class="escudo"')
+
+
+@pytest.mark.parametrize(
+    "url, esperado",
+    [
+        ("/historico", 3),                 # um campeão por temporada
+        ("/historico/1/jogos", 10),        # campeão + 3 confrontos x 3 times (Equipe)
+        ("/historico/3/jogos", 10),        # idem, confrontos em string/lista
+        ("/historico/1/classificacao", 4),  # 4 times (Equipe)
+        ("/historico/3/classificacao", 4),  # 4 times (string)
+        ("/campeoes", 5),                  # 3 temporadas + 2 times com título
+    ],
+)
+def test_telas_de_historico_mostram_escudo_com_equipe_e_string(url, esperado):
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    resposta = client.get(url)
+
+    assert resposta.status_code == 200
+    assert _contar_escudos(resposta.text) == esperado
+
+
+def _historico_em_string_do_terminal():
+    """Formato do save do terminal: tudo string, confrontos como listas."""
+    return [{
+        "temporada": 2026,
+        "campeao": "Flamengo",
+        "fases": [{"nome_fase": "Final - Campeonato Teste",
+                   "confrontos": [["Flamengo", "Time Desconhecido",
+                                   "Flamengo", 5, 3]]}],
+    }]
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["/historico", "/historico/1/jogos", "/historico/1/classificacao",
+     "/campeoes"],
+)
+def test_historico_em_string_usa_cores_do_catalogo_pelo_nome(url):
+    _iniciar_jogo_com_historico(_historico_em_string_do_terminal())
+
+    resposta = client.get(url)
+
+    assert resposta.status_code == 200
+    assert "#C4161C" in resposta.text  # vermelho do Flamengo no catálogo
+
+
+@pytest.mark.parametrize("url", ["/historico/1/jogos", "/historico/1/classificacao"])
+def test_time_fora_do_catalogo_usa_escudo_cinza(url):
+    _iniciar_jogo_com_historico(_historico_em_string_do_terminal())
+
+    texto = client.get(url).text
+
+    assert "Escudo do Time Desconhecido" in texto
+    for cor in CORES_ESCUDO_PADRAO:
+        assert cor in texto
+
+
+def test_classificacao_com_escudo_mostra_todos_os_nomes_do_grupo():
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get("/historico/1/classificacao").text
+    linha_semifinal = re.search(r"<td>Semifinal</td>\s*<td>(.*?)</td>", texto, re.S).group(1)
+
+    assert _contar_escudos(linha_semifinal) == 2
+    assert "Time B" in linha_semifinal and "Time C" in linha_semifinal
+    assert _sem_escudo(linha_semifinal) == "Time B, Time C"
+
+
+def test_nome_visivel_continua_fora_do_svg_com_equipe_e_string():
+    """O nome também aparece no `aria-label`/`<title>` do escudo — garante
+    que ele continua visível como texto, e não só dentro do SVG."""
+    historico = [
+        {"temporada": 2026, "campeao": Equipe("Time Objeto"), "fases": []},
+        {"temporada": 2027, "campeao": "Time String", "fases": []},
+    ]
+    _iniciar_jogo_com_historico(historico)
+
+    texto = _sem_escudo(client.get("/historico").text)
+
+    assert re.search(r"<td>2026</td>\s*<td>Time Objeto</td>", texto)
+    assert re.search(r"<td>2027</td>\s*<td>Time String</td>", texto)
+
+
+@pytest.mark.parametrize(
+    "url", ["/historico", "/historico/1/jogos", "/historico/1/classificacao",
+            "/campeoes"],
+)
+def test_nome_com_html_e_escapado_no_texto_e_no_escudo(url):
+    nome = "<script>alert(1)</script>"
+    historico = [{
+        "temporada": 2026,
+        "campeao": nome,
+        "fases": [{"nome_fase": "Final - Campeonato Teste",
+                   "confrontos": [[nome, "Time B", nome, 2, 1]]}],
+    }]
+    _iniciar_jogo_com_historico(historico)
+
+    texto = client.get(url).text
+
+    assert nome not in texto
+    assert "Escudo do &lt;script&gt;" in texto
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in _sem_escudo(texto)

@@ -20,7 +20,7 @@
             {% for temporada_info in historico %}
                 <tr>
                     <td>{{ temporada_info.temporada }}</td>
-                    <td>{{ temporada_info.campeao }}</td>
+                    <td><span class="time">{{ escudo(temporada_info.campeao, 20) }}{{ temporada_info.campeao }}</span></td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -37,7 +37,7 @@
             <tbody>
             {% for time, titulos in titulos_por_time %}
                 <tr>
-                    <td>{{ time }}</td>
+                    <td><span class="time">{{ escudo(time, 20) }}{{ time }}</span></td>
                     <td>{{ titulos }}</td>
                 </tr>
             {% endfor %}
