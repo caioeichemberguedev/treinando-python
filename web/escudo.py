@@ -1,6 +1,6 @@
-"""Gerador do escudo dos times: um SVG inline em formato de retângulo com
-cantos arredondados (altura = 1,5 × largura), com 1 a 4 faixas verticais de
-mesma largura, uma por cor do time, da esquerda para a direita.
+"""Gerador do escudo dos times: um SVG inline em formato quadrado com
+cantos arredondados (a largura é igual à altura), com 1 a 4 faixas verticais
+de mesma largura, uma por cor do time, da esquerda para a direita.
 
 Registrado como global `escudo` do Jinja2 em `web/templates_config.py`:
 `{{ escudo(time) }}`, `{{ escudo(campeao, 96) }}` ou, na prévia do adm,
@@ -20,9 +20,10 @@ from equipe import Equipe
 # ou com alguma cor inválida.
 CORES_ESCUDO_PADRAO = ["#9E9E9E", "#BDBDBD"]
 
-# Geometria no viewBox 0 0 60 90 (proporção largura:altura = 1:1,5).
+# Geometria no viewBox quadrado 0 0 60 60 (largura = altura): faixas com
+# largura inteira para 1 a 4 cores (60/30/20/15).
 LARGURA_VIEWBOX = 60
-ALTURA_VIEWBOX = 90
+ALTURA_VIEWBOX = 60
 RAIO_CANTO = 8
 
 # Borda em PIXELS DE TELA (não em unidades do viewBox): com
@@ -74,7 +75,8 @@ def _numero(valor):
 def escudo_svg(time, tamanho=24, cores=None):
     """Gera o SVG inline do escudo de `time` (Equipe, id, string ou None).
 
-    `tamanho` é a ALTURA em pixels; a largura é 2/3 da altura. `cores`, se
+    `tamanho` é a ALTURA em pixels; o escudo é quadrado, então a largura é
+    igual à altura. `cores`, se
     informado, substitui as cores do time (prévia do adm); cores inválidas
     viram o escudo cinza. Retorna `Markup` para o Jinja2 não escapar o SVG
     — por isso o nome é escapado aqui e as cores são validadas antes de

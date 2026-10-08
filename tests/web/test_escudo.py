@@ -202,30 +202,31 @@ def test_n_cores_geram_n_faixas_iguais_na_ordem(quantidade):
         assert float(faixa.get("height")) == ALTURA_VIEWBOX
 
 
-def test_tamanho_e_a_altura_e_largura_e_dois_tercos():
+def test_tamanho_e_a_altura_e_largura_igual():
     raiz = ET.fromstring(str(escudo_svg(Equipe("X", cores=CORES_TESTE), 96)))
 
     assert raiz.get("height") == "96"
-    assert raiz.get("width") == "64"
-    assert raiz.get("viewBox") == "0 0 60 90"
+    assert raiz.get("width") == "96"
+    assert raiz.get("viewBox") == "0 0 60 60"
 
 
 def test_tamanho_padrao_e_24_de_altura():
     raiz = ET.fromstring(str(escudo_svg(Equipe("X", cores=CORES_TESTE))))
 
     assert raiz.get("height") == "24"
-    assert raiz.get("width") == "16"
+    assert raiz.get("width") == "24"
 
 
 @pytest.mark.parametrize("tamanho", [20, 24, 40, 96])
-def test_altura_e_uma_vez_e_meia_a_largura(tamanho):
+def test_escudo_e_quadrado(tamanho):
     raiz = ET.fromstring(
         str(escudo_svg(Equipe("X", cores=CORES_TESTE), tamanho))
     )
 
     assert float(raiz.get("height")) == tamanho
-    proporcao = float(raiz.get("height")) / float(raiz.get("width"))
-    assert proporcao == pytest.approx(1.5, abs=0.001)
+    assert float(raiz.get("width")) == tamanho
+    assert raiz.get("viewBox") == f"0 0 {LARGURA_VIEWBOX} {ALTURA_VIEWBOX}"
+    assert LARGURA_VIEWBOX == ALTURA_VIEWBOX
 
 
 def test_recorte_e_retangulo_com_cantos_arredondados():
@@ -351,7 +352,7 @@ def test_global_do_jinja_aceita_tamanho():
     html = templates.env.from_string("{{ escudo(t, 96) }}").render(t="Brasil")
 
     assert 'height="96"' in html
-    assert 'width="64"' in html
+    assert 'width="96"' in html
 
 
 def test_global_do_jinja_aceita_cores_da_previa():
