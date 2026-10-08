@@ -340,16 +340,55 @@ def test_constantes_dos_padroes():
     assert catalogo.PADRAO_DIAGONAL_DESCE == "diagonal_desce"
 
 
-def test_sem_arquivo_do_adm_todo_time_e_vertical():
+def test_sem_arquivo_do_adm_so_sao_paulo_e_vasco_nao_sao_verticais():
     assert not os.path.exists(catalogo.ARQUIVO_CATALOGO)
 
-    for time in catalogo.carregar_catalogo().values():
-        assert time["padrao"] == "verticais"
+    efetivo = catalogo.carregar_catalogo()
+    assert efetivo[1]["padrao"] == "horizontais"
+    assert efetivo[6]["padrao"] == "diagonal_sobe"
+    outros = {id_time: time["padrao"] for id_time, time in efetivo.items() if id_time not in (1, 6)}
+    assert len(outros) == 30
+    assert set(outros.values()) == {"verticais"}
+
+
+def test_cadastro_padrao_sao_paulo_horizontais_mantem_as_cores():
+    # De cima para baixo: vermelho, branco, preto.
+    assert catalogo.padrao_do_time(1) == "horizontais"
+    assert catalogo.cores_do_time(1) == ["#E30613", "#FFFFFF", "#000000"]
+
+
+def test_cadastro_padrao_vasco_diagonal_sobe_preto_e_branco():
+    # Cor 1 = fundo preto, cor 2 = faixa branca.
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
+    assert catalogo.cores_do_time(6) == ["#000000", "#FFFFFF"]
+
+
+@pytest.mark.parametrize("time", catalogo.TIMES_PADRAO, ids=lambda time: time["nome"])
+def test_todo_time_do_times_padrao_tem_padrao_valido(time):
+    padrao = time.get("padrao", catalogo.PADRAO_VERTICAIS)
+    assert catalogo.padrao_valido(padrao, time["cores"])
+
+
+def test_edicao_antiga_do_sao_paulo_sem_padrao_vira_verticais():
+    # Cenário do catalogo_times.json real: edição do id 1 feita antes do E-012.
+    with open(catalogo.ARQUIVO_CATALOGO, "w", encoding="utf-8") as arquivo:
+        json.dump({"1": {"nome": "São Paulo", "cores": ["#E30613", "#000000", "#FFFFFF"]}}, arquivo)
+
+    assert catalogo.padrao_do_time(1) == "verticais"
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
 
 
 @pytest.mark.parametrize(
     ("id_time", "padrao"),
-    [(1, "verticais"), (32, "verticais"), (999, None), (None, None), ([1], None)],
+    [
+        (1, "horizontais"),
+        (6, "diagonal_sobe"),
+        (2, "verticais"),
+        (32, "verticais"),
+        (999, None),
+        (None, None),
+        ([1], None),
+    ],
 )
 def test_padrao_do_time(id_time, padrao):
     assert catalogo.padrao_do_time(id_time) == padrao
@@ -357,11 +396,11 @@ def test_padrao_do_time(id_time, padrao):
 
 def test_padrao_do_times_padrao_vale_quando_nao_ha_edicao(monkeypatch):
     times = [dict(time) for time in catalogo.TIMES_PADRAO]
-    times[5]["padrao"] = "diagonal_sobe"
+    times[2]["padrao"] = "diagonal_desce"
     monkeypatch.setattr(catalogo, "TIMES_PADRAO", times)
 
-    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
-    assert catalogo.padrao_do_time(1) == "verticais"
+    assert catalogo.padrao_do_time(3) == "diagonal_desce"
+    assert catalogo.padrao_do_time(4) == "verticais"
 
 
 def test_edicao_antiga_sem_padrao_carrega_como_verticais(monkeypatch):
@@ -419,7 +458,8 @@ def test_salvar_padrao_invalido_levanta_value_error_e_nao_grava(cores, padrao, m
         catalogo.salvar_time_no_catalogo(6, "Vasco", cores, padrao=padrao)
 
     assert not os.path.exists(catalogo.ARQUIVO_CATALOGO)
-    assert catalogo.padrao_do_time(6) == "verticais"
+    # Nada gravado: continua o padrão do cadastro (TIMES_PADRAO).
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
 
 
 @pytest.mark.parametrize(

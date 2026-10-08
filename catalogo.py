@@ -58,15 +58,23 @@ MINIMO_CORES_DIAGONAL = 2
 _cache = None
 
 # Copa do Brasil = ids 1-16, Copa do Mundo 2026 = ids 17-32. As cores são as
-# faixas do escudo (hex, de 1 a 4). Chave opcional "padrao" (um de `PADROES`);
-# ausente → verticais.
+# faixas do escudo (hex, de 1 a 4), na ordem do padrão. Chave opcional
+# "padrao" (um de `PADROES`, precisa passar em `padrao_valido`); ausente →
+# verticais. Hoje só São Paulo (horizontais, de cima para baixo) e Vasco
+# (diagonal ↗: cor 1 = fundo preto, cor 2 = faixa branca) têm a chave.
 TIMES_PADRAO = [
-    {"id": 1, "campeonato": "Copa do Brasil", "nome": "São Paulo", "cores": ["#E30613", "#FFFFFF", "#000000"]},
+    {
+        "id": 1, "campeonato": "Copa do Brasil", "nome": "São Paulo",
+        "cores": ["#E30613", "#FFFFFF", "#000000"], "padrao": PADRAO_HORIZONTAIS,
+    },
     {"id": 2, "campeonato": "Copa do Brasil", "nome": "Palmeiras", "cores": ["#006437", "#FFFFFF", "#006437"]},
     {"id": 3, "campeonato": "Copa do Brasil", "nome": "Corinthians", "cores": ["#000000", "#FFFFFF"]},
     {"id": 4, "campeonato": "Copa do Brasil", "nome": "Santos", "cores": ["#FFFFFF", "#000000", "#FFFFFF"]},
     {"id": 5, "campeonato": "Copa do Brasil", "nome": "Flamengo", "cores": ["#C4161C", "#000000", "#C4161C"]},
-    {"id": 6, "campeonato": "Copa do Brasil", "nome": "Vasco", "cores": ["#000000", "#FFFFFF", "#E30613"]},
+    {
+        "id": 6, "campeonato": "Copa do Brasil", "nome": "Vasco",
+        "cores": ["#000000", "#FFFFFF"], "padrao": PADRAO_DIAGONAL_SOBE,
+    },
     {"id": 7, "campeonato": "Copa do Brasil", "nome": "Botafogo", "cores": ["#000000", "#FFFFFF", "#000000"]},
     {"id": 8, "campeonato": "Copa do Brasil", "nome": "Fluminense", "cores": ["#870A28", "#FFFFFF", "#00613C"]},
     {"id": 9, "campeonato": "Copa do Brasil", "nome": "Grêmio", "cores": ["#0D80BF", "#000000", "#FFFFFF"]},
