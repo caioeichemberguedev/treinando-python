@@ -17,7 +17,10 @@ import re
 from equipe import Equipe
 
 # Edições do adm: {"<id>": {"nome": "...", "cores": ["#RRGGBB", ...]}}.
-ARQUIVO_CATALOGO = "catalogo_times.json"
+# Caminho absoluto na pasta do projeto (a de `catalogo.py`), para valer o
+# mesmo arquivo qualquer que seja o diretório de onde o jogo é iniciado.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARQUIVO_CATALOGO = os.path.join(BASE_DIR, "catalogo_times.json")
 
 TAMANHO_MAXIMO_NOME = 40
 MINIMO_CORES = 1

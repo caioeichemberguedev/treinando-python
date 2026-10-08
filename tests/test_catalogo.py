@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import re
@@ -299,3 +300,24 @@ def test_cache_rele_quando_o_caminho_do_arquivo_muda(tmp_path, monkeypatch):
     monkeypatch.setattr(catalogo, "ARQUIVO_CATALOGO", str(tmp_path / "outro.json"))
 
     assert catalogo.nome_do_time(1) == "São Paulo"
+
+
+# --- Caminho do catálogo independente do diretório atual (ID-009) -----------
+
+
+def test_arquivo_catalogo_fica_na_pasta_do_projeto_qualquer_que_seja_o_cwd(
+    tmp_path, monkeypatch
+):
+    # A fixture do conftest já trocou `catalogo.ARQUIVO_CATALOGO`; por isso o
+    # teste carrega uma cópia nova do módulo para ver o valor calculado na
+    # importação, com o diretório atual fora do projeto.
+    monkeypatch.chdir(tmp_path)
+    spec = importlib.util.spec_from_file_location("catalogo_fresco", catalogo.__file__)
+    catalogo_fresco = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(catalogo_fresco)
+
+    pasta_projeto = os.path.dirname(os.path.abspath(catalogo.__file__))
+    caminho = catalogo_fresco.ARQUIVO_CATALOGO
+    assert os.path.isabs(caminho)
+    assert caminho == os.path.join(pasta_projeto, "catalogo_times.json")
+    assert not os.path.abspath(caminho).startswith(str(tmp_path))
