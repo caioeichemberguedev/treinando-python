@@ -35,6 +35,44 @@ def _assert_usa_cores(svg, cores):
     assert [f.get("fill") for f in _faixas(svg)] == cores
 
 
+def _borda(svg):
+    """O `<rect class="escudo-borda">` do escudo."""
+    raiz = ET.fromstring(svg)
+    return raiz.find(f"{NS}rect[@class='escudo-borda']")
+
+
+def _assert_borda_branca_fina(borda):
+    assert borda is not None
+    assert borda.get("stroke") == "#FFFFFF"
+    assert borda.get("stroke-width") == "1"
+    assert borda.get("vector-effect") == "non-scaling-stroke"
+    assert borda.get("fill") == "none"
+
+
+def test_borda_e_branca_fina_e_nao_escala():
+    _assert_borda_branca_fina(_borda(str(escudo_svg(Equipe("X", cores=CORES_TESTE)))))
+
+
+@pytest.mark.parametrize("tamanho", [20, 24, 40, 96])
+def test_borda_inteira_dentro_do_viewbox_com_recuo_de_meio_pixel(tamanho):
+    borda = _borda(str(escudo_svg(Equipe("X", cores=CORES_TESTE), tamanho)))
+
+    x, y = float(borda.get("x")), float(borda.get("y"))
+    largura, altura = float(borda.get("width")), float(borda.get("height"))
+    assert x == pytest.approx(y)
+    assert x > 0
+    assert x + largura == pytest.approx(LARGURA_VIEWBOX - x, abs=0.001)
+    assert y + altura == pytest.approx(ALTURA_VIEWBOX - y, abs=0.001)
+    assert x * tamanho / ALTURA_VIEWBOX == pytest.approx(0.5, abs=0.001)
+    assert float(borda.get("rx")) > 0
+
+
+def test_previa_do_adm_tem_a_mesma_borda_branca():
+    svg = str(escudo_svg(1, 96, cores=["#123456", "#654321"]))
+
+    _assert_borda_branca_fina(_borda(svg))
+
+
 def test_escudo_com_cores_tem_estrutura_completa():
     svg = str(escudo_svg(Equipe("X", cores=CORES_TESTE)))
 

@@ -24,9 +24,11 @@ CORES_ESCUDO_PADRAO = ["#9E9E9E", "#BDBDBD"]
 LARGURA_VIEWBOX = 60
 ALTURA_VIEWBOX = 90
 RAIO_CANTO = 8
-ESPESSURA_BORDA = 3
 
-COR_BORDA = "#1A1A1A"
+# Borda em PIXELS DE TELA (não em unidades do viewBox): com
+# vector-effect="non-scaling-stroke" o traço fica com 1 px em qualquer tamanho.
+ESPESSURA_BORDA = 1
+COR_BORDA = "#FFFFFF"
 
 # Contador de módulo: garante um id de clipPath único por escudo gerado
 # (várias SVGs inline na mesma página não podem repetir id).
@@ -100,7 +102,9 @@ def escudo_svg(time, tamanho=24, cores=None):
     )
 
     # Borda recuada meia espessura para o traço não ser cortado nas bordas.
-    recuo = ESPESSURA_BORDA / 2
+    # A espessura está em px de tela; convertida para unidades do viewBox
+    # pela altura (max evita divisão por zero com tamanho <= 0).
+    recuo = (ESPESSURA_BORDA / 2) * ALTURA_VIEWBOX / max(altura, 1)
     svg = (
         f'<svg class="escudo" xmlns="http://www.w3.org/2000/svg" '
         f'viewBox="0 0 {LARGURA_VIEWBOX} {ALTURA_VIEWBOX}" '
@@ -114,10 +118,11 @@ def escudo_svg(time, tamanho=24, cores=None):
         f'<g class="escudo-faixas" clip-path="url(#{id_clip})">{faixas}</g>'
         f'<rect class="escudo-borda" x="{_numero(recuo)}" '
         f'y="{_numero(recuo)}" '
-        f'width="{_numero(LARGURA_VIEWBOX - ESPESSURA_BORDA)}" '
-        f'height="{_numero(ALTURA_VIEWBOX - ESPESSURA_BORDA)}" '
+        f'width="{_numero(LARGURA_VIEWBOX - 2 * recuo)}" '
+        f'height="{_numero(ALTURA_VIEWBOX - 2 * recuo)}" '
         f'rx="{_numero(RAIO_CANTO - recuo)}" fill="none" '
-        f'stroke="{COR_BORDA}" stroke-width="{ESPESSURA_BORDA}"/>'
+        f'stroke="{COR_BORDA}" stroke-width="{ESPESSURA_BORDA}" '
+        f'vector-effect="non-scaling-stroke"/>'
         f"</svg>"
     )
     return Markup(svg)
