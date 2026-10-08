@@ -1,4 +1,5 @@
 import itertools
+import json
 import re
 import xml.etree.ElementTree as ET
 
@@ -10,6 +11,7 @@ from equipe import Equipe
 from web.escudo import (
     ALTURA_VIEWBOX,
     CORES_ESCUDO_PADRAO,
+    LARGURA_DIAGONAL,
     LARGURA_VIEWBOX,
     escudo_svg,
 )
@@ -392,3 +394,260 @@ def test_global_nome_time_escapa_html():
     )
 
     assert html == "&lt;b&gt;"
+
+
+# --- E-012-T3: padrões horizontais e diagonal --------------------------------
+
+def _numero_svg(valor):
+    return f"{valor:.4f}".rstrip("0").rstrip(".")
+
+
+def _grupo_diagonal(svg):
+    raiz = ET.fromstring(svg)
+    return raiz.find(f"{NS}g/{NS}g[@class='escudo-diagonal']")
+
+
+def _assert_verticais(svg, cores):
+    """Faixas verticais: só `rect` diretos, de altura cheia, sem diagonal."""
+    assert _grupo_diagonal(svg) is None
+    faixas = _faixas(svg)
+    assert [f.get("fill") for f in faixas] == cores
+    for faixa in faixas:
+        assert float(faixa.get("height")) == ALTURA_VIEWBOX
+
+
+def _assert_diagonal(svg, cores, angulo):
+    fundo = _faixas(svg)
+    assert len(fundo) == 1
+    assert fundo[0].get("fill") == cores[0]
+    assert float(fundo[0].get("width")) == LARGURA_VIEWBOX
+    assert float(fundo[0].get("height")) == ALTURA_VIEWBOX
+
+    grupo = _grupo_diagonal(svg)
+    assert grupo is not None
+    centro = _numero_svg(LARGURA_VIEWBOX / 2)
+    assert grupo.get("transform") == f"rotate({angulo} {centro} {centro})"
+    faixas = grupo.findall(f"{NS}rect")
+    assert [f.get("fill") for f in faixas] == cores[1:]
+
+
+def _gravar_catalogo_a_mao(edicoes):
+    with open(catalogo.ARQUIVO_CATALOGO, "w", encoding="utf-8") as arquivo:
+        json.dump(edicoes, arquivo)
+    catalogo.limpar_cache()
+
+
+@pytest.mark.parametrize("quantidade", [1, 2, 3, 4])
+def test_horizontais_n_cores_geram_n_faixas_iguais_de_cima_para_baixo(
+    quantidade,
+):
+    cores = ["#111111", "#222222", "#333333", "#444444"][:quantidade]
+    svg = str(escudo_svg(901, cores=cores, padrao="horizontais"))
+
+    assert _grupo_diagonal(svg) is None
+    faixas = _faixas(svg)
+    assert [f.get("fill") for f in faixas] == cores
+    alturas = [float(f.get("height")) for f in faixas]
+    assert len(set(alturas)) == 1
+    assert sum(alturas) == pytest.approx(ALTURA_VIEWBOX, abs=0.001)
+    ys = [float(f.get("y")) for f in faixas]
+    assert ys == pytest.approx(
+        [i * ALTURA_VIEWBOX / quantidade for i in range(quantidade)],
+        abs=0.001,
+    )
+    for faixa in faixas:
+        assert float(faixa.get("x")) == 0
+        assert float(faixa.get("width")) == LARGURA_VIEWBOX
+
+
+@pytest.mark.parametrize(
+    "padrao, angulo", [("diagonal_sobe", -45), ("diagonal_desce", 45)]
+)
+@pytest.mark.parametrize("quantidade", [2, 3, 4])
+def test_diagonal_tem_fundo_na_cor_1_e_faixa_com_as_demais(
+    padrao, angulo, quantidade
+):
+    cores = ["#111111", "#222222", "#333333", "#444444"][:quantidade]
+    svg = str(escudo_svg(901, cores=cores, padrao=padrao))
+
+    _assert_diagonal(svg, cores, angulo)
+    faixas = _grupo_diagonal(svg).findall(f"{NS}rect")
+    espessuras = [float(f.get("height")) for f in faixas]
+    assert len(set(espessuras)) == 1
+    assert sum(espessuras) == pytest.approx(LARGURA_DIAGONAL, abs=0.001)
+    ys = [float(f.get("y")) for f in faixas]
+    inicio = ALTURA_VIEWBOX / 2 - LARGURA_DIAGONAL / 2
+    assert ys == pytest.approx(
+        [inicio + i * LARGURA_DIAGONAL / (quantidade - 1)
+         for i in range(quantidade - 1)],
+        abs=0.001,
+    )
+    for faixa in faixas:
+        # Comprida de sobra para cobrir o quadrado depois de girada.
+        x, largura = float(faixa.get("x")), float(faixa.get("width"))
+        assert x < 0
+        assert x + largura > LARGURA_VIEWBOX
+
+
+def test_faixa_diagonal_visivel_no_escudo_de_20_px():
+    svg = str(escudo_svg(
+        901, 20, cores=["#000000", "#FFFFFF"], padrao="diagonal_sobe"
+    ))
+
+    assert ET.fromstring(svg).get("height") == "20"
+    _assert_diagonal(svg, ["#000000", "#FFFFFF"], -45)
+    # Espessura da faixa em pixels de tela: pelo menos 6 px.
+    assert LARGURA_DIAGONAL * 20 / ALTURA_VIEWBOX >= 6
+
+
+def test_id_salvo_como_diagonal_no_catalogo_desenha_diagonal():
+    catalogo.salvar_time_no_catalogo(
+        6, "Vasco", ["#000000", "#FFFFFF"], padrao="diagonal_sobe"
+    )
+
+    _assert_diagonal(str(escudo_svg(6)), ["#000000", "#FFFFFF"], -45)
+    _assert_diagonal(
+        str(escudo_svg(Equipe("X", id=6))), ["#000000", "#FFFFFF"], -45
+    )
+
+
+def test_id_salvo_como_horizontais_no_catalogo_desenha_horizontais():
+    cores = ["#FF0000", "#FFFFFF", "#000000"]
+    catalogo.salvar_time_no_catalogo(1, "São Paulo", cores, padrao="horizontais")
+
+    faixas = _faixas(str(escudo_svg(1)))
+    assert [f.get("fill") for f in faixas] == cores
+    assert [float(f.get("width")) for f in faixas] == [LARGURA_VIEWBOX] * 3
+
+
+@pytest.mark.parametrize(
+    "time",
+    [
+        Equipe("Vasco", cores=["#000000", "#FFFFFF"]),
+        Equipe("X", id=901, cores=["#000000", "#FFFFFF"]),
+        "Vasco",
+        None,
+        999,
+    ],
+)
+def test_sem_id_conhecido_desenha_verticais(time):
+    catalogo.salvar_time_no_catalogo(
+        6, "Vasco", ["#000000", "#FFFFFF"], padrao="diagonal_sobe"
+    )
+
+    svg = str(escudo_svg(time))
+
+    assert _grupo_diagonal(svg) is None
+    for faixa in _faixas(svg):
+        assert float(faixa.get("height")) == ALTURA_VIEWBOX
+
+
+def test_diagonal_com_uma_cor_vira_verticais():
+    _assert_verticais(
+        str(escudo_svg(901, cores=["#123456"], padrao="diagonal_sobe")),
+        ["#123456"],
+    )
+
+
+@pytest.mark.parametrize("padrao", ["lixo", "", "VERTICAIS", 3, ["x"]])
+def test_padrao_explicito_invalido_vira_verticais(padrao):
+    cores = ["#111111", "#222222"]
+
+    _assert_verticais(str(escudo_svg(901, cores=cores, padrao=padrao)), cores)
+
+
+@pytest.mark.parametrize("padrao", ["xadrez", None, 7])
+def test_padrao_invalido_gravado_no_arquivo_vira_verticais(padrao):
+    cores = ["#000000", "#FFFFFF"]
+    _gravar_catalogo_a_mao(
+        {"6": {"nome": "Vasco", "cores": cores, "padrao": padrao}}
+    )
+
+    _assert_verticais(str(escudo_svg(6)), cores)
+
+
+def test_diagonal_gravada_com_uma_cor_no_arquivo_vira_verticais():
+    _gravar_catalogo_a_mao(
+        {"6": {"nome": "Vasco", "cores": ["#000000"], "padrao": "diagonal_sobe"}}
+    )
+
+    _assert_verticais(str(escudo_svg(6)), ["#000000"])
+
+
+def test_cores_invalidas_com_padrao_diagonal_viram_cinza_vertical():
+    svg = str(escudo_svg(1, cores=["red", "#000000"], padrao="diagonal_sobe"))
+
+    _assert_verticais(svg, CORES_ESCUDO_PADRAO)
+
+
+def test_cores_invalidas_no_catalogo_com_diagonal_viram_cinza_vertical():
+    _gravar_catalogo_a_mao(
+        {"6": {"nome": "Vasco", "cores": ["red", "#000000"],
+               "padrao": "diagonal_sobe"}}
+    )
+
+    _assert_verticais(str(escudo_svg(6)), CORES_ESCUDO_PADRAO)
+
+
+def test_previa_com_padrao_ignora_o_padrao_do_catalogo():
+    catalogo.salvar_time_no_catalogo(
+        1, "São Paulo", ["#FF0000", "#000000"], padrao="diagonal_desce"
+    )
+    cores = ["#123456", "#654321", "#ABCDEF"]
+
+    svg = str(escudo_svg(1, 96, cores=cores, padrao="horizontais"))
+
+    assert _grupo_diagonal(svg) is None
+    faixas = _faixas(svg)
+    assert [f.get("fill") for f in faixas] == cores
+    assert [float(f.get("width")) for f in faixas] == [LARGURA_VIEWBOX] * 3
+
+
+def test_previa_sem_padrao_usa_o_padrao_do_catalogo():
+    catalogo.salvar_time_no_catalogo(
+        6, "Vasco", ["#000000", "#FFFFFF"], padrao="diagonal_desce"
+    )
+
+    svg = str(escudo_svg(6, 96, cores=["#123456", "#654321"]))
+
+    _assert_diagonal(svg, ["#123456", "#654321"], 45)
+
+
+@pytest.mark.parametrize("padrao", list(catalogo.PADROES))
+@pytest.mark.parametrize("tamanho", [20, 96])
+def test_todos_os_padroes_mantem_borda_recorte_e_xml_valido(padrao, tamanho):
+    svg = str(escudo_svg(
+        Equipe("<b>&</b>", id=901), tamanho,
+        cores=["#111111", "#222222", "#333333"], padrao=padrao,
+    ))
+
+    raiz = ET.fromstring(svg)  # levanta ParseError se o SVG for inválido
+    _assert_borda_branca_fina(_borda(svg))
+    recorte = raiz.find(f".//{NS}clipPath/{NS}rect")
+    assert float(recorte.get("rx")) > 0
+    assert float(recorte.get("width")) == LARGURA_VIEWBOX
+    grupo = raiz.find(f"{NS}g")
+    assert grupo.get("class") == "escudo-faixas"
+    assert grupo.get("clip-path") == f"url(#{_id_clip(svg)})"
+    # A borda vem depois do grupo recortado (desenhada por cima).
+    filhos = list(raiz)
+    borda = raiz.find(f"{NS}rect[@class='escudo-borda']")
+    assert filhos.index(grupo) < filhos.index(borda)
+
+
+def test_ids_de_clip_unicos_com_padroes_diferentes():
+    svgs = [
+        str(escudo_svg(901, cores=["#111111", "#222222"], padrao=padrao))
+        for padrao in catalogo.PADROES
+    ]
+
+    ids = [_id_clip(svg) for svg in svgs]
+    assert len(set(ids)) == len(ids)
+
+
+def test_global_do_jinja_aceita_padrao_da_previa():
+    html = templates.env.from_string(
+        "{{ escudo(901, 96, cores=c, padrao=p) }}"
+    ).render(c=["#123456", "#654321"], p="diagonal_sobe")
+
+    _assert_diagonal(html, ["#123456", "#654321"], -45)
