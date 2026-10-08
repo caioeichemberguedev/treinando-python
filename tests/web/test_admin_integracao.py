@@ -175,7 +175,7 @@ def test_so_o_time_editado_vai_para_o_arquivo_do_catalogo(editado):
     with open(catalogo.ARQUIVO_CATALOGO, encoding="utf-8") as arquivo:
         gravado = json.load(arquivo)
 
-    assert gravado == {"1": {"nome": NOME_NOVO, "cores": CORES_NOVAS}}
+    assert gravado == {"1": {"nome": NOME_NOVO, "cores": CORES_NOVAS, "padrao": "verticais"}}
     assert catalogo.nome_do_time(2) == "Palmeiras"
 
 

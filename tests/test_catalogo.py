@@ -107,6 +107,7 @@ def _padrao_por_id():
             "campeonato": time["campeonato"],
             "nome": time["nome"],
             "cores": time["cores"],
+            "padrao": time.get("padrao", catalogo.PADRAO_VERTICAIS),
         }
         for time in catalogo.TIMES_PADRAO
     }
@@ -141,7 +142,7 @@ def test_salvar_normaliza_nome_e_cores():
     catalogo.salvar_time_no_catalogo(1, "  SPFC  ", ["#ff00aa", "#ffffff"])
 
     assert _ler_arquivo_catalogo() == {
-        "1": {"nome": "SPFC", "cores": ["#FF00AA", "#FFFFFF"]}
+        "1": {"nome": "SPFC", "cores": ["#FF00AA", "#FFFFFF"], "padrao": "verticais"}
     }
 
 
@@ -321,3 +322,139 @@ def test_arquivo_catalogo_fica_na_pasta_do_projeto_qualquer_que_seja_o_cwd(
     assert os.path.isabs(caminho)
     assert caminho == os.path.join(pasta_projeto, "catalogo_times.json")
     assert not os.path.abspath(caminho).startswith(str(tmp_path))
+
+
+# --- Padrão do escudo no catálogo (E-012) -----------------------------------
+
+
+def test_constantes_dos_padroes():
+    assert catalogo.PADROES == (
+        "verticais",
+        "horizontais",
+        "diagonal_sobe",
+        "diagonal_desce",
+    )
+    assert catalogo.PADRAO_VERTICAIS == "verticais"
+    assert catalogo.PADRAO_HORIZONTAIS == "horizontais"
+    assert catalogo.PADRAO_DIAGONAL_SOBE == "diagonal_sobe"
+    assert catalogo.PADRAO_DIAGONAL_DESCE == "diagonal_desce"
+
+
+def test_sem_arquivo_do_adm_todo_time_e_vertical():
+    assert not os.path.exists(catalogo.ARQUIVO_CATALOGO)
+
+    for time in catalogo.carregar_catalogo().values():
+        assert time["padrao"] == "verticais"
+
+
+@pytest.mark.parametrize(
+    ("id_time", "padrao"),
+    [(1, "verticais"), (32, "verticais"), (999, None), (None, None), ([1], None)],
+)
+def test_padrao_do_time(id_time, padrao):
+    assert catalogo.padrao_do_time(id_time) == padrao
+
+
+def test_padrao_do_times_padrao_vale_quando_nao_ha_edicao(monkeypatch):
+    times = [dict(time) for time in catalogo.TIMES_PADRAO]
+    times[5]["padrao"] = "diagonal_sobe"
+    monkeypatch.setattr(catalogo, "TIMES_PADRAO", times)
+
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
+    assert catalogo.padrao_do_time(1) == "verticais"
+
+
+def test_edicao_antiga_sem_padrao_carrega_como_verticais(monkeypatch):
+    times = [dict(time) for time in catalogo.TIMES_PADRAO]
+    times[0]["padrao"] = "horizontais"
+    monkeypatch.setattr(catalogo, "TIMES_PADRAO", times)
+    with open(catalogo.ARQUIVO_CATALOGO, "w", encoding="utf-8") as arquivo:
+        json.dump({"1": {"nome": "X", "cores": ["#000000"]}}, arquivo)
+
+    assert catalogo.nome_do_time(1) == "X"
+    assert catalogo.cores_do_time(1) == ["#000000"]
+    # Edição antiga não herda o padrão do TIMES_PADRAO.
+    assert catalogo.padrao_do_time(1) == "verticais"
+
+
+def test_salvar_com_padrao_diagonal_grava_e_vale_no_efetivo():
+    catalogo.salvar_time_no_catalogo(
+        6, "Vasco", ["#000000", "#FFFFFF"], padrao="diagonal_sobe"
+    )
+
+    assert _ler_arquivo_catalogo() == {
+        "6": {"nome": "Vasco", "cores": ["#000000", "#FFFFFF"], "padrao": "diagonal_sobe"}
+    }
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
+
+
+def test_salvar_sem_padrao_grava_verticais():
+    catalogo.salvar_time_no_catalogo(6, "Vasco", ["#000000", "#FFFFFF"])
+
+    assert _ler_arquivo_catalogo()["6"]["padrao"] == "verticais"
+    assert catalogo.padrao_do_time(6) == "verticais"
+
+
+@pytest.mark.parametrize(
+    ("cores", "padrao", "mensagem"),
+    [
+        (["#000000", "#FFFFFF"], "xadrez", "Padrão de escudo inválido."),
+        (["#000000", "#FFFFFF"], None, "Padrão de escudo inválido."),
+        (
+            ["#000000"],
+            "diagonal_desce",
+            "O padrão diagonal precisa de pelo menos 2 cores (a cor 1 é o fundo).",
+        ),
+        (
+            ["#000000"],
+            "diagonal_sobe",
+            "O padrão diagonal precisa de pelo menos 2 cores (a cor 1 é o fundo).",
+        ),
+    ],
+)
+def test_salvar_padrao_invalido_levanta_value_error_e_nao_grava(cores, padrao, mensagem):
+    assert catalogo.validar_time(6, "Vasco", cores, padrao) == [mensagem]
+
+    with pytest.raises(ValueError, match=mensagem.split(" (")[0]):
+        catalogo.salvar_time_no_catalogo(6, "Vasco", cores, padrao=padrao)
+
+    assert not os.path.exists(catalogo.ARQUIVO_CATALOGO)
+    assert catalogo.padrao_do_time(6) == "verticais"
+
+
+@pytest.mark.parametrize(
+    ("cores", "padrao"),
+    [
+        (["#000000", "#FFFFFF"], "diagonal_sobe"),
+        (["#000000", "#FFFFFF", "#E30613"], "diagonal_desce"),
+        (["#000000", "#FFFFFF", "#E30613", "#111111"], "diagonal_sobe"),
+        (["#000000"], "horizontais"),
+        (["#000000"], "verticais"),
+    ],
+)
+def test_salvar_padrao_valido(cores, padrao):
+    catalogo.salvar_time_no_catalogo(6, "Vasco", cores, padrao=padrao)
+
+    assert catalogo.padrao_do_time(6) == padrao
+    assert catalogo.cores_do_time(6) == cores
+
+
+@pytest.mark.parametrize(
+    ("padrao", "cores", "valido"),
+    [
+        ("verticais", ["#000000"], True),
+        ("verticais", ["#000000", "#FFFFFF"], True),
+        ("horizontais", ["#000000"], True),
+        ("horizontais", ["#000000", "#FFFFFF"], True),
+        ("diagonal_sobe", ["#000000"], False),
+        ("diagonal_sobe", ["#000000", "#FFFFFF"], True),
+        ("diagonal_desce", ["#000000"], False),
+        ("diagonal_desce", ["#000000", "#FFFFFF"], True),
+        ("xadrez", ["#000000", "#FFFFFF"], False),
+        ("", ["#000000"], False),
+        (None, ["#000000"], False),
+        ("diagonal_sobe", None, False),
+    ],
+)
+def test_padrao_valido(padrao, cores, valido):
+    assert catalogo.padrao_valido(padrao, cores) is valido

@@ -1,13 +1,19 @@
-"""Catálogo de identidade dos times: id fixo, campeonato, nome e cores.
+"""Catálogo de identidade dos times: id fixo, campeonato, nome, cores e
+padrão do escudo.
 
 É a fonte da verdade do elenco padrão (o `equipes.json` é regenerado a
 partir daqui por `persistencia.restaurar_equipes_padrao()`). O id é a chave
 que identifica o time; o nome é só o que aparece na tela.
 
-O adm pode editar nome e cores de cada time. Essas edições ficam em
-`ARQUIVO_CATALOGO` (só os times alterados) e valem por cima de
-`TIMES_PADRAO`: o resultado é o "catálogo efetivo" (`carregar_catalogo()`),
-que é o que `nome_do_time`, `cores_do_time` e `nome_para_exibir` consultam.
+O adm pode editar nome, cores e padrão do escudo de cada time. Essas
+edições ficam em `ARQUIVO_CATALOGO` (só os times alterados) e valem por cima
+de `TIMES_PADRAO`: o resultado é o "catálogo efetivo" (`carregar_catalogo()`),
+que é o que `nome_do_time`, `cores_do_time`, `padrao_do_time` e
+`nome_para_exibir` consultam.
+
+O padrão do escudo é um de `PADROES`. Time do `TIMES_PADRAO` sem a chave
+`"padrao"` e edição antiga do adm sem `"padrao"` → `PADRAO_VERTICAIS` (a
+edição antiga não herda o padrão do `TIMES_PADRAO`).
 """
 
 import json
@@ -16,7 +22,9 @@ import re
 
 from equipe import Equipe
 
-# Edições do adm: {"<id>": {"nome": "...", "cores": ["#RRGGBB", ...]}}.
+# Edições do adm:
+# {"<id>": {"nome": "...", "cores": ["#RRGGBB", ...], "padrao": "verticais"}}.
+# "padrao" é opcional na leitura (arquivo antigo → verticais).
 # Caminho absoluto na pasta do projeto (a de `catalogo.py`), para valer o
 # mesmo arquivo qualquer que seja o diretório de onde o jogo é iniciado.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,13 +36,30 @@ MAXIMO_CORES = 4
 
 _PADRAO_HEX = re.compile(r"#[0-9A-Fa-f]{6}")
 
+# Padrões do escudo. Diagonal: cor 1 = fundo, demais cores = faixa inclinada;
+# "sobe" = de baixo-esquerda para cima-direita (como o Vasco), "desce" = ao
+# contrário.
+PADRAO_VERTICAIS = "verticais"
+PADRAO_HORIZONTAIS = "horizontais"
+PADRAO_DIAGONAL_SOBE = "diagonal_sobe"
+PADRAO_DIAGONAL_DESCE = "diagonal_desce"
+PADROES = (
+    PADRAO_VERTICAIS,
+    PADRAO_HORIZONTAIS,
+    PADRAO_DIAGONAL_SOBE,
+    PADRAO_DIAGONAL_DESCE,
+)
+_PADROES_DIAGONAIS = (PADRAO_DIAGONAL_SOBE, PADRAO_DIAGONAL_DESCE)
+MINIMO_CORES_DIAGONAL = 2
+
 # Cache do catálogo efetivo: (chave, catálogo). A chave muda quando o
 # arquivo muda (mtime/tamanho), quando o caminho é trocado (testes) ou
 # quando `TIMES_PADRAO` é substituído (monkeypatch nos testes).
 _cache = None
 
 # Copa do Brasil = ids 1-16, Copa do Mundo 2026 = ids 17-32. As cores são as
-# faixas do escudo (hex, de 1 a 4, da esquerda para a direita).
+# faixas do escudo (hex, de 1 a 4). Chave opcional "padrao" (um de `PADROES`);
+# ausente → verticais.
 TIMES_PADRAO = [
     {"id": 1, "campeonato": "Copa do Brasil", "nome": "São Paulo", "cores": ["#E30613", "#FFFFFF", "#000000"]},
     {"id": 2, "campeonato": "Copa do Brasil", "nome": "Palmeiras", "cores": ["#006437", "#FFFFFF", "#006437"]},
@@ -88,7 +113,7 @@ def _chave_cache():
 
 
 def _ler_edicoes_adm():
-    """Lê `ARQUIVO_CATALOGO` → {id (int): {"nome", "cores"}}.
+    """Lê `ARQUIVO_CATALOGO` → {id (int): {"nome", "cores", "padrao"}}.
 
     Arquivo ausente → {}. Entradas com chave não numérica são ignoradas.
     """
@@ -106,6 +131,15 @@ def _ler_edicoes_adm():
     return edicoes
 
 
+def _padrao_da_fonte(time, edicao):
+    """Padrão efetivo: o da edição do adm, se houver edição; senão o do
+    `TIMES_PADRAO`. Em ambos, sem a chave → verticais.
+    """
+    if edicao:
+        return edicao.get("padrao", PADRAO_VERTICAIS)
+    return time.get("padrao", PADRAO_VERTICAIS)
+
+
 def _montar_catalogo():
     """`TIMES_PADRAO` com as edições do adm por cima."""
     edicoes = _ler_edicoes_adm()
@@ -116,12 +150,13 @@ def _montar_catalogo():
             "campeonato": time["campeonato"],
             "nome": edicao.get("nome", time["nome"]),
             "cores": list(edicao.get("cores", time["cores"])),
+            "padrao": _padrao_da_fonte(time, edicao),
         }
     return catalogo_efetivo
 
 
 def carregar_catalogo():
-    """Catálogo efetivo: {id: {"campeonato", "nome", "cores"}}.
+    """Catálogo efetivo: {id: {"campeonato", "nome", "cores", "padrao"}}.
 
     Usa cache em memória e só relê o arquivo do adm quando ele muda. Não
     altere o dict devolvido: ele é o próprio cache (as funções públicas de
@@ -157,6 +192,14 @@ def cores_do_time(id_time):
     return list(time["cores"]) if time is not None else None
 
 
+def padrao_do_time(id_time):
+    """Padrão do escudo do time com esse id (um de `PADROES`, ou o valor
+    gravado pelo adm), ou None se o id não existir.
+    """
+    time = _time_por_id(id_time)
+    return time["padrao"] if time is not None else None
+
+
 def cores_validas(cores):
     """True se `cores` é uma lista/tupla de 1 a 4 hex no formato `#RRGGBB`."""
     if not isinstance(cores, (list, tuple)):
@@ -168,7 +211,23 @@ def cores_validas(cores):
     )
 
 
-def validar_time(id_time, nome, cores):
+def padrao_valido(padrao, cores):
+    """True se `padrao` é um de `PADROES` e combina com `cores`.
+
+    Diagonal exige pelo menos 2 cores (a cor 1 é o fundo). Não valida o
+    formato das cores (isso é `cores_validas`).
+    """
+    if padrao not in PADROES:
+        return False
+    if padrao in _PADROES_DIAGONAIS:
+        try:
+            return len(cores) >= MINIMO_CORES_DIAGONAL
+        except TypeError:
+            return False
+    return True
+
+
+def validar_time(id_time, nome, cores, padrao=PADRAO_VERTICAIS):
     """Valida uma edição do adm. Devolve a lista de mensagens de erro
     (vazia se estiver tudo certo).
     """
@@ -196,16 +255,24 @@ def validar_time(id_time, nome, cores):
             f"Escolha de {MINIMO_CORES} a {MAXIMO_CORES} cores no formato "
             "#RRGGBB."
         )
+
+    if padrao not in PADROES:
+        erros.append("Padrão de escudo inválido.")
+    elif not padrao_valido(padrao, cores):
+        erros.append(
+            "O padrão diagonal precisa de pelo menos 2 cores (a cor 1 é o "
+            "fundo)."
+        )
     return erros
 
 
-def salvar_time_no_catalogo(id_time, nome, cores):
-    """Grava a edição do adm (nome sem espaços nas pontas e cores em
-    maiúsculas) em `ARQUIVO_CATALOGO`.
+def salvar_time_no_catalogo(id_time, nome, cores, padrao=PADRAO_VERTICAIS):
+    """Grava a edição do adm (nome sem espaços nas pontas, cores em
+    maiúsculas e padrão do escudo, sempre presente) em `ARQUIVO_CATALOGO`.
 
     Inválido → `ValueError` com as mensagens de erro, sem gravar nada.
     """
-    erros = validar_time(id_time, nome, cores)
+    erros = validar_time(id_time, nome, cores, padrao)
     if erros:
         raise ValueError(" ".join(erros))
 
@@ -215,6 +282,7 @@ def salvar_time_no_catalogo(id_time, nome, cores):
     edicoes[str(id_time)] = {
         "nome": nome.strip(),
         "cores": [cor.upper() for cor in cores],
+        "padrao": padrao,
     }
     with open(ARQUIVO_CATALOGO, "w", encoding="utf-8") as arquivo:
         json.dump(edicoes, arquivo, ensure_ascii=False, indent=2)
