@@ -549,3 +549,140 @@ def test_nome_com_script_salvo_aparece_escapado(com_senha, cliente):
         tela = cliente.get(url)
         assert "<script>alert" not in tela.text
         assert "&lt;script&gt;" in tela.text
+
+
+# --- Padrão do escudo (E-012-T5) --------------------------------------------
+
+SAO_PAULO_ORIGINAL = ["#E30613", "#FFFFFF", "#000000"]
+
+
+def _radio_marcado(texto, valor):
+    return f'name="padrao" value="{valor}" checked' in texto
+
+
+def test_get_editar_tem_4_radios_com_verticais_marcado(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin/times/3")
+
+    assert resposta.status_code == 200
+    assert resposta.text.count('type="radio"') == 4
+    assert resposta.text.count('name="padrao"') == 4
+    for valor in catalogo.PADROES:
+        assert f'value="{valor}"' in resposta.text
+    for rotulo in admin.ROTULOS_PADRAO.values():
+        assert rotulo in resposta.text
+    assert resposta.text.count(" checked") == 1
+    assert _radio_marcado(resposta.text, "verticais")
+    assert "<script" not in resposta.text
+
+
+def test_get_editar_marca_o_padrao_atual_do_vasco(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin/times/6")
+
+    assert _radio_marcado(resposta.text, "diagonal_sobe")
+    assert resposta.text.count(" checked") == 1
+    assert "rotate(-45 30 30)" in resposta.text
+
+
+def test_previa_horizontais_desenha_faixas_e_nao_grava(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 3, nome="Corinthians", faixas="3", cor_1="#111111",
+        cor_2="#222222", cor_3="#333333", padrao="horizontais",
+        acao="previa",
+    )
+
+    assert resposta.status_code == 200
+    assert 'width="60" height="20"' in resposta.text
+    assert _radio_marcado(resposta.text, "horizontais")
+    assert resposta.text.count(" checked") == 1
+    assert catalogo.padrao_do_time(3) == "verticais"
+    assert catalogo.cores_do_time(3) == ["#000000", "#FFFFFF"]
+
+
+def test_previa_diagonal_desce_usa_rotacao_positiva(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 3, nome="Corinthians", faixas="2", cor_1="#000000",
+        cor_2="#ffffff", padrao="diagonal_desce", acao="previa",
+    )
+
+    assert resposta.status_code == 200
+    assert "rotate(45 30 30)" in resposta.text
+    assert _radio_marcado(resposta.text, "diagonal_desce")
+    assert catalogo.padrao_do_time(3) == "verticais"
+
+
+def test_previa_ignora_o_padrao_do_catalogo(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 6, nome="Vasco", faixas="2", cor_1="#000000",
+        cor_2="#ffffff", padrao="verticais", acao="previa",
+    )
+
+    assert resposta.status_code == 200
+    assert "rotate(" not in resposta.text
+    assert catalogo.padrao_do_time(6) == "diagonal_sobe"
+
+
+def test_salvar_diagonal_grava_o_padrao(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 3, nome="Corinthians", faixas="2", cor_1="#000000",
+        cor_2="#ffffff", padrao="diagonal_sobe", acao="salvar",
+    )
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/admin"
+    assert catalogo.padrao_do_time(3) == "diagonal_sobe"
+    assert _radio_marcado(
+        cliente.get("/admin/times/3").text, "diagonal_sobe"
+    )
+
+
+def test_salvar_sem_campo_padrao_grava_verticais(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="São Paulo", faixas="3", cor_1="#e30613",
+        cor_2="#ffffff", cor_3="#000000", acao="salvar",
+    )
+
+    assert resposta.status_code == 303
+    assert catalogo.padrao_do_time(1) == "verticais"
+
+
+@pytest.mark.parametrize(
+    "campos, mensagem",
+    [
+        ({"faixas": "1", "padrao": "xadrez"}, "Padrão de escudo inválido."),
+        ({"faixas": "1", "padrao": "Verticais"}, "Padrão de escudo inválido."),
+        ({"faixas": "1", "padrao": "diagonal_sobe"},
+         "O padrão diagonal precisa de pelo menos 2 cores"),
+        ({"faixas": "1", "padrao": "diagonal_desce"},
+         "O padrão diagonal precisa de pelo menos 2 cores"),
+    ],
+)
+@pytest.mark.parametrize("acao", ["salvar", "previa"])
+def test_padrao_invalido_da_400_e_nao_grava(
+    com_senha, cliente, campos, mensagem, acao
+):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="SPFC", cor_1="#ff0000", acao=acao, **campos
+    )
+
+    assert resposta.status_code == 400
+    assert mensagem in resposta.text
+    assert resposta.text.count(" checked") == 1
+    assert catalogo.nome_do_time(1) == "São Paulo"
+    assert catalogo.cores_do_time(1) == SAO_PAULO_ORIGINAL
+    assert catalogo.padrao_do_time(1) == "horizontais"

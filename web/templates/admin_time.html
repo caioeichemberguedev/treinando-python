@@ -14,7 +14,7 @@
     {% endif %}
 
     <p>Prévia do escudo:</p>
-    <p>{{ escudo(id_time, 96, cores=cores_previa) }}</p>
+    <p>{{ escudo(id_time, 96, cores=cores_previa, padrao=padrao) }}</p>
 
     <form method="post" action="{{ url_for('salvar_time_admin', id_time=id_time) }}">
         <p>
@@ -29,10 +29,22 @@
             {% endfor %}
             </select>
         </p>
-        <p>Só as primeiras cores, até a quantidade de faixas escolhida, são usadas (da esquerda para a direita).</p>
+        <fieldset>
+            <legend>Padrão do escudo</legend>
+            {% for valor, rotulo in opcoes_padrao %}
+                <p>
+                    <input type="radio" id="padrao_{{ valor }}" name="padrao" value="{{ valor }}"{% if valor == padrao %} checked{% endif %}>
+                    <label for="padrao_{{ valor }}">{{ rotulo }}</label>
+                </p>
+            {% endfor %}
+        </fieldset>
+        <p>Só as primeiras cores, até a quantidade de faixas escolhida, são usadas.
+            Faixas verticais: da esquerda para a direita.
+            Faixas horizontais: de cima para baixo.
+            Diagonal: a cor 1 é o fundo e as demais formam a faixa inclinada (precisa de pelo menos 2 cores).</p>
         {% for cor in cores %}
             <p>
-                <label for="cor_{{ loop.index }}">Cor da faixa {{ loop.index }}</label>
+                <label for="cor_{{ loop.index }}">Cor {{ loop.index }}</label>
                 <input type="color" id="cor_{{ loop.index }}" name="cor_{{ loop.index }}" value="{{ cor }}">
             </p>
         {% endfor %}

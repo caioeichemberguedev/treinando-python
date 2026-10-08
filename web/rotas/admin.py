@@ -16,6 +16,9 @@ Decisões 6 e 7 do ID-008 (ver `docs/backlog.md`):
   seletores de cor; só as `faixas` primeiras valem, o resto é ignorado.
   "Pré-visualizar" só redesenha o escudo (sem JavaScript); "Salvar" grava
   no catálogo do adm (`catalogo.salvar_time_no_catalogo`).
+- Padrão do escudo (E-012, decisão 7): grupo de rádios `padrao` com os
+  valores de `catalogo.PADROES`; campo ausente no POST → verticais. A
+  prévia sempre desenha o padrão do formulário.
 """
 
 from typing import Annotated
@@ -35,6 +38,14 @@ CAMINHO_COOKIE = "/admin"
 
 # Valor inicial dos seletores de cor excedentes (ou enviados vazios).
 COR_SELETOR_PADRAO = "#FFFFFF"
+
+# Rótulos dos rádios do padrão do escudo, na ordem de `catalogo.PADROES`.
+ROTULOS_PADRAO = {
+    catalogo.PADRAO_VERTICAIS: "Faixas verticais",
+    catalogo.PADRAO_HORIZONTAIS: "Faixas horizontais",
+    catalogo.PADRAO_DIAGONAL_SOBE: "Diagonal ↗",
+    catalogo.PADRAO_DIAGONAL_DESCE: "Diagonal ↘",
+}
 
 
 def _exigir_area_ativa():
@@ -129,13 +140,17 @@ def _completar_cores(cores: list[str]) -> list[str]:
     return list(cores[:catalogo.MAXIMO_CORES]) + [COR_SELETOR_PADRAO] * faltam
 
 
-def _contexto_time(id_time, nome, faixas, cores, cores_previa, erros):
+def _contexto_time(id_time, nome, faixas, cores, cores_previa, padrao, erros):
     """Contexto do `admin_time.html`.
 
     `cores` são os 4 valores dos seletores (em minúsculas, o formato que o
     `<input type="color">` usa); `cores_previa` vai para `escudo(...,
-    cores=...)` — None desenha as cores atuais do catálogo.
+    cores=...)` — None desenha as cores atuais do catálogo. `padrao` marca
+    o rádio e vai sempre para a prévia (`escudo(..., padrao=...)`); valor
+    fora de `catalogo.PADROES` vira verticais.
     """
+    if padrao not in catalogo.PADROES:
+        padrao = catalogo.PADRAO_VERTICAIS
     return {
         "id_time": id_time,
         "nome": nome,
@@ -143,6 +158,10 @@ def _contexto_time(id_time, nome, faixas, cores, cores_previa, erros):
         "opcoes_faixas": range(catalogo.MINIMO_CORES, catalogo.MAXIMO_CORES + 1),
         "cores": [cor.lower() for cor in _completar_cores(cores)],
         "cores_previa": cores_previa,
+        "padrao": padrao,
+        "opcoes_padrao": [
+            (valor, ROTULOS_PADRAO[valor]) for valor in catalogo.PADROES
+        ],
         "erros": erros,
     }
 
@@ -160,11 +179,13 @@ def _ler_faixas(faixas: str) -> int | None:
 
 @router.get("/times/{id_time}", dependencies=[Depends(_exigir_admin)])
 def tela_editar_time_admin(request: Request, id_time: int):
-    """Formulário de edição já preenchido com o catálogo efetivo."""
+    """Formulário de edição já preenchido com o catálogo efetivo (nome,
+    cores e padrão do escudo)."""
     _id_time_existente(id_time)
     cores = catalogo.cores_do_time(id_time)
     contexto = _contexto_time(
-        id_time, catalogo.nome_do_time(id_time), len(cores), cores, None, []
+        id_time, catalogo.nome_do_time(id_time), len(cores), cores, None,
+        catalogo.padrao_do_time(id_time), [],
     )
     return templates.TemplateResponse(request, "admin_time.html", contexto)
 
@@ -179,6 +200,7 @@ def salvar_time_admin(
     cor_2: Annotated[str, Form()] = "",
     cor_3: Annotated[str, Form()] = "",
     cor_4: Annotated[str, Form()] = "",
+    padrao: Annotated[str, Form()] = catalogo.PADRAO_VERTICAIS,
     acao: Annotated[str, Form()] = "previa",
 ):
     """Valida o formulário. `acao=salvar` válido → grava e volta para
@@ -186,9 +208,12 @@ def salvar_time_admin(
     gravar. Inválido → 400 com as mensagens e o catálogo intacto.
 
     Os campos têm default vazio para que um campo faltando caia numa
-    mensagem em português em vez de um 422 genérico.
+    mensagem em português em vez de um 422 genérico. Exceção: `padrao`
+    ausente vale verticais (formulários antigos sem o rádio); valor fora de
+    `catalogo.PADROES` ou diagonal com 1 cor → 400.
     """
     _id_time_existente(id_time)
+    padrao = padrao.strip()
     enviadas = [cor.strip() for cor in (cor_1, cor_2, cor_3, cor_4)]
 
     erros = []
@@ -206,13 +231,13 @@ def salvar_time_admin(
                 erros.append(f"Escolha a cor da faixa {posicao}.")
 
     if not erros:
-        erros = catalogo.validar_time(id_time, nome, cores)
+        erros = catalogo.validar_time(id_time, nome, cores, padrao)
 
     # Os seletores voltam com o que foi enviado (ou a cor padrão, se vazio).
     cores_formulario = [cor or COR_SELETOR_PADRAO for cor in enviadas]
     if erros:
         contexto = _contexto_time(
-            id_time, nome, quantidade, cores_formulario, None, erros
+            id_time, nome, quantidade, cores_formulario, None, padrao, erros
         )
         return templates.TemplateResponse(
             request, "admin_time.html", contexto, status_code=400
@@ -221,10 +246,11 @@ def salvar_time_admin(
     cores = [cor.upper() for cor in cores]
     if acao == "salvar":
         try:
-            catalogo.salvar_time_no_catalogo(id_time, nome, cores)
+            catalogo.salvar_time_no_catalogo(id_time, nome, cores, padrao)
         except ValueError as erro:
             contexto = _contexto_time(
-                id_time, nome, quantidade, cores_formulario, None, [str(erro)]
+                id_time, nome, quantidade, cores_formulario, None, padrao,
+                [str(erro)],
             )
             return templates.TemplateResponse(
                 request, "admin_time.html", contexto, status_code=400
@@ -232,6 +258,6 @@ def salvar_time_admin(
         return RedirectResponse(url=URL_ADMIN, status_code=303)
 
     contexto = _contexto_time(
-        id_time, nome.strip(), quantidade, cores_formulario, cores, []
+        id_time, nome.strip(), quantidade, cores_formulario, cores, padrao, []
     )
     return templates.TemplateResponse(request, "admin_time.html", contexto)
