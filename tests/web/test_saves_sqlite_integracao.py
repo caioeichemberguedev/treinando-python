@@ -75,11 +75,13 @@ def test_carreira_do_terminal_salva_no_meio_e_carregada_pela_web(monkeypatch):
     assert jogo is not None
     assert [t.id for t in jogo.classificados] == [t.id for t in dados["classificados"]]
 
+    # Listar/carregar pela web não regrava o save. A comparação fica antes do
+    # `GET /fase`: se o time do jogador já foi eliminado, esse GET decide a
+    # fase e grava o retrato seguinte (E-018).
+    assert open(caminho, "rb").read() == bytes_antes
+
     fase = client.get("/fase")
     assert fase.status_code == 200
-
-    # Listar/carregar pela web não regrava o save.
-    assert open(caminho, "rb").read() == bytes_antes
 
 
 def test_excluir_pela_web_apaga_o_arquivo_sem_conexao_presa(monkeypatch):

@@ -5,6 +5,11 @@ O confronto do jogador é resolvido passo a passo em `/fase/penaltis`
 (uma cobrança por requisição, com escolha de canto pelo jogador) — os
 demais confrontos da fase continuam resolvidos automaticamente
 (`interativo=False`, dentro de `montar_confrontos_fase`).
+
+Gravação da carreira (E-018), nos mesmos momentos do terminal e sempre via
+`web.estado.salvar_jogo_em_andamento`: no novo jogo, quando a fase fica
+decidida (`_fechar_fase` — a final já coroa o campeão e grava a próxima
+temporada) e ao seguir para a próxima temporada. "Avançar fase" só navega.
 """
 
 from typing import Annotated
@@ -14,8 +19,9 @@ from fastapi.responses import RedirectResponse
 
 from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classificados
 from penaltis import CANTOS, cobranca_time_a, cobranca_time_b, criar_disputa
-from persistencia import carregar_equipes
-from web.estado import EstadoJogo, iniciar_jogo, obter_jogo
+from equipe import Equipe
+from persistencia import carregar_equipes, gerar_nome_save
+from web.estado import EstadoJogo, iniciar_jogo, obter_jogo, salvar_jogo_em_andamento
 from web.templates_config import templates
 
 router = APIRouter(tags=["jogo"])
@@ -42,7 +48,8 @@ def escolher_campeonato(request: Request, campeonato: Annotated[str, Form()]):
 @router.post("/novo-jogo/time")
 def escolher_time(campeonato: Annotated[str, Form()], time: Annotated[int, Form()]):
     """Recebe o time escolhido (pelo `id`, não pelo nome), inicializa o jogo
-    em memória (temporada 2026, classificados embaralhados) e segue pra fase
+    em memória (temporada 2026, classificados embaralhados), cria o save da
+    carreira (`gerar_nome_save()`, como o `menu.novo_jogo`) e segue pra fase
     atual. Id fora do campeonato → 404; valor não numérico → 422 (validação
     do próprio FastAPI).
     """
@@ -56,7 +63,10 @@ def escolher_time(campeonato: Annotated[str, Form()], time: Annotated[int, Form(
         raise HTTPException(status_code=404, detail="Time não encontrado nesse campeonato.")
 
     classificados = sortear_classificados(times)
-    iniciar_jogo(campeonato, time_escolhido, 2026, classificados, times_do_campeonato=times)
+    jogo = iniciar_jogo(
+        campeonato, time_escolhido, 2026, classificados, times_do_campeonato=times, nome_save=gerar_nome_save()
+    )
+    salvar_jogo_em_andamento(jogo, jogo.temporada, jogo.classificados)
 
     return RedirectResponse(url="/fase", status_code=303)
 
@@ -67,7 +77,9 @@ def _resolver_fase_atual(jogo: EstadoJogo) -> None:
     recalcular a cada requisição.
 
     O confronto do jogador (`confronto_pendente`) fica guardado sem vencedor
-    — quem resolve é o fluxo passo a passo de `/fase/penaltis`.
+    — quem resolve é o fluxo passo a passo de `/fase/penaltis`. Sem confronto
+    pendente (jogador já eliminado), a fase já sai decidida e é fechada na
+    hora (`_fechar_fase`).
     """
     nome_fase, confrontos, confronto_pendente, proximos = montar_confrontos_fase(
         jogo.classificados, jogo.time_escolhido, jogo.campeonato
@@ -80,6 +92,52 @@ def _resolver_fase_atual(jogo: EstadoJogo) -> None:
         "proximos": proximos,
     }
 
+    if confronto_pendente is None:
+        _fechar_fase(jogo)
+
+
+def _retrato_apos_fase(jogo: EstadoJogo) -> tuple[int, list[Equipe] | None]:
+    """`(temporada, classificados)` do "depois" da fase decidida — o que o
+    save guarda: `(temporada + 1, None)` se a temporada acabou (campeão
+    definido), senão `(temporada, proximos)` da fase atual.
+    """
+    if jogo.campeao is not None:
+        return jogo.temporada + 1, None
+    return jogo.temporada, jogo.fase_atual["proximos"]
+
+
+def _fechar_fase(jogo: EstadoJogo) -> None:
+    """Fecha a fase atual no instante em que fica decidida (uma vez por
+    fase), como o terminal faz antes do prompt "ENTER / sair": acrescenta a
+    fase em `fases_da_temporada`; se sobrou 1 classificado, coroa o campeão e
+    soma a temporada ao `historico` (formato de ids do save, via
+    `registro_da_fase` e `campeao.id`); e grava o retrato do "depois"
+    (`_retrato_apos_fase`).
+
+    Não mexe em `jogo.classificados` nem em `jogo.fase_atual`: a tela da fase
+    continua mostrando o resultado até o "Avançar fase".
+
+    Com o campeão da temporada já coroado, não faz nada — proteção para
+    nunca contar o título nem somar a temporada ao histórico duas vezes.
+    """
+    if jogo.campeao is not None:
+        return
+
+    jogo.fases_da_temporada.append(
+        {"nome_fase": jogo.fase_atual["nome_fase"], "confrontos": jogo.fase_atual["confrontos"]}
+    )
+    proximos = jogo.fase_atual["proximos"]
+
+    if len(proximos) == 1:
+        campeao = proximos[0]
+        campeao.sagrar_campea()
+        jogo.campeao = campeao
+        fases = [registro_da_fase(fase["nome_fase"], fase["confrontos"]) for fase in jogo.fases_da_temporada]
+        jogo.historico.append({"temporada": jogo.temporada, "campeao": campeao.id, "fases": fases})
+
+    temporada, classificados = _retrato_apos_fase(jogo)
+    salvar_jogo_em_andamento(jogo, temporada, classificados)
+
 
 @router.get("/fase")
 def tela_fase(request: Request):
@@ -90,10 +148,17 @@ def tela_fase(request: Request):
     Se a fase ainda tiver o confronto do jogador pendente, redireciona pra
     `/fase/penaltis` em vez de exibir — essa tela só mostra fases já
     totalmente decididas.
+
+    Com a temporada encerrada (campeão coroado e "Avançar" já clicado),
+    redireciona pra `/campeao`: não há próxima fase a montar (ex.: botão
+    voltar do navegador depois da final).
     """
     jogo = obter_jogo()
     if jogo is None:
         raise HTTPException(status_code=404, detail="Nenhum jogo em andamento. Comece um novo jogo.")
+
+    if jogo.fase_atual is None and jogo.campeao is not None:
+        return RedirectResponse(url="/campeao", status_code=303)
 
     if jogo.fase_atual is None:
         _resolver_fase_atual(jogo)
@@ -154,8 +219,9 @@ def _iniciar_disputa_penaltis(jogo: EstadoJogo, confronto_pendente: tuple) -> No
 def _concluir_disputa_penaltis(jogo: EstadoJogo) -> None:
     """Fecha a disputa de pênaltis em andamento: registra vitória/eliminação,
     soma o confronto decidido em `jogo.fase_atual` (mesmo formato usado
-    pelos confrontos resolvidos automaticamente) e limpa
-    `jogo.disputa_penaltis`.
+    pelos confrontos resolvidos automaticamente), limpa
+    `jogo.disputa_penaltis` e fecha a fase (`_fechar_fase`), que agora está
+    decidida.
     """
     disputa = jogo.disputa_penaltis
     estado_disputa = disputa["estado"]
@@ -178,6 +244,7 @@ def _concluir_disputa_penaltis(jogo: EstadoJogo) -> None:
     jogo.fase_atual["proximos"] = jogo.fase_atual["proximos"] + [vencedor]
     jogo.fase_atual["confronto_pendente"] = None
     jogo.disputa_penaltis = None
+    _fechar_fase(jogo)
 
 
 @router.get("/fase/penaltis")
@@ -264,13 +331,10 @@ def cobrar_penalti(canto: Annotated[str | None, Form()] = None):
 
 @router.post("/fase/avancar")
 def avancar_fase():
-    """Fecha a fase atual e monta a próxima: se sobrar 1 classificado, marca
-    o campeão da temporada e segue pra `GET /campeao`; senão, volta pra
-    `GET /fase` já com os novos classificados.
-
-    `fases_da_temporada` continua com objetos `Equipe` (exibição), mas o que
-    vai para `jogo.historico` usa ids (`registro_da_fase` e `campeao.id`) —
-    mesmo formato do save do terminal.
+    """Só navega: a fase já foi fechada e gravada quando ficou decidida
+    (`_fechar_fase`). Passa os classificados da fase para a próxima e segue
+    pra `GET /campeao` se a temporada acabou (campeão definido), senão volta
+    pra `GET /fase`, que monta a próxima fase.
     """
     jogo = obter_jogo()
     if jogo is None or jogo.fase_atual is None:
@@ -281,19 +345,10 @@ def avancar_fase():
             status_code=400, detail="Ainda falta decidir a disputa de pênaltis do seu time nesta fase."
         )
 
-    jogo.fases_da_temporada.append(
-        {"nome_fase": jogo.fase_atual["nome_fase"], "confrontos": jogo.fase_atual["confrontos"]}
-    )
-    proximos = jogo.fase_atual["proximos"]
+    jogo.classificados = jogo.fase_atual["proximos"]
     jogo.fase_atual = None
-    jogo.classificados = proximos
 
-    if len(proximos) == 1:
-        campeao = proximos[0]
-        campeao.sagrar_campea()
-        jogo.campeao = campeao
-        fases = [registro_da_fase(fase["nome_fase"], fase["confrontos"]) for fase in jogo.fases_da_temporada]
-        jogo.historico.append({"temporada": jogo.temporada, "campeao": campeao.id, "fases": fases})
+    if jogo.campeao is not None:
         return RedirectResponse(url="/campeao", status_code=303)
 
     return RedirectResponse(url="/fase", status_code=303)
@@ -326,7 +381,8 @@ def continuar_para_proxima_temporada():
     objetos `Equipe` mutados ao longo da temporada anterior, não um elenco
     novo recarregado do arquivo), incrementa a temporada e zera a
     fase/campeão atuais — espelha o que `menu_pos_temporada` faz quando o
-    jogador escolhe "Seguir para a próxima temporada" no terminal.
+    jogador escolhe "Seguir para a próxima temporada" no terminal. Grava a
+    nova temporada já sorteada no mesmo save.
     """
     jogo = obter_jogo()
     if jogo is None or jogo.campeao is None:
@@ -339,5 +395,6 @@ def continuar_para_proxima_temporada():
     jogo.fases_da_temporada = []
     jogo.fase_atual = None
     jogo.campeao = None
+    salvar_jogo_em_andamento(jogo, jogo.temporada, jogo.classificados)
 
     return RedirectResponse(url="/fase", status_code=303)

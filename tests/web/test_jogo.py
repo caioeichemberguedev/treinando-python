@@ -419,8 +419,12 @@ def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
     o chute, o goleiro adversário nunca defende; o goleiro do jogador
     sempre defende o adversário) e a disputa termina sem completar as 5
     rodadas, sem depender de qual lado do par o jogador caiu.
+
+    Usa a "Copa Teste" (4 times): a 1ª fase não é a final, então vencer nos
+    pênaltis não pode contar título (desde o E-018 a final coroa o campeão
+    assim que fica decidida).
     """
-    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
     client.get("/fase/penaltis")  # garante que a disputa foi criada antes do monkeypatch
 
     valores = iter([1, 2, 1, 1] * 3)
@@ -437,10 +441,12 @@ def test_penaltis_corte_antecipado_decide_o_confronto_do_jogador(monkeypatch):
     assert resposta.headers["location"] == "/fase"
 
     jogo = estado.obter_jogo()
-    time_a, time_b, vencedor, gols_a, gols_b = jogo.fase_atual["confrontos"][0]
-    assert vencedor.id == 901
+    # O confronto do jogador entra por último (depois do resolvido sozinho).
+    time_a, time_b, vencedor, gols_a, gols_b = jogo.fase_atual["confrontos"][-1]
+    assert vencedor.id == 905
     assert vencedor.titulos == 0  # título só é contado no campeão da temporada
-    if time_a.id == 901:
+    assert jogo.campeao is None
+    if time_a.id == 905:
         assert (gols_a, gols_b) == (3, 0)
     else:
         assert (gols_a, gols_b) == (0, 3)
