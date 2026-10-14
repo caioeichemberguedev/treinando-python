@@ -1,0 +1,108 @@
+{
+  "1": {
+    "nome": "São Paulo",
+    "cores": [
+      "#E30613",
+      "#FFFFFF",
+      "#000000"
+    ],
+    "padrao": "horizontais"
+  },
+  "12": {
+    "nome": "Atlético-MG",
+    "cores": [
+      "#000000",
+      "#FFFFFF"
+    ],
+    "padrao": "verticais"
+  },
+  "4": {
+    "nome": "Santos",
+    "cores": [
+      "#FFFFFF",
+      "#000000"
+    ],
+    "padrao": "verticais"
+  },
+  "2": {
+    "nome": "Palmeiras",
+    "cores": [
+      "#006437",
+      "#FFFFFF"
+    ],
+    "padrao": "verticais"
+  },
+  "5": {
+    "nome": "Flamengo",
+    "cores": [
+      "#C4161C",
+      "#000000"
+    ],
+    "padrao": "horizontais"
+  },
+  "6": {
+    "nome": "Vasco",
+    "cores": [
+      "#000000",
+      "#FFFFFF"
+    ],
+    "padrao": "diagonal_desce"
+  },
+  "7": {
+    "nome": "Botafogo",
+    "cores": [
+      "#000000",
+      "#FFFFFF"
+    ],
+    "padrao": "horizontais"
+  },
+  "9": {
+    "nome": "Grêmio",
+    "cores": [
+      "#0D80BF",
+      "#FFFFFF",
+      "#000000"
+    ],
+    "padrao": "verticais"
+  },
+  "10": {
+    "nome": "Internacional",
+    "cores": [
+      "#E5050F",
+      "#FFFFFF"
+    ],
+    "padrao": "verticais"
+  },
+  "11": {
+    "nome": "Cruzeiro",
+    "cores": [
+      "#3695DD",
+      "#FFFFFF"
+    ],
+    "padrao": "verticais"
+  },
+  "14": {
+    "nome": "Vitória",
+    "cores": [
+      "#000000",
+      "#FF0000"
+    ],
+    "padrao": "verticais"
+  },
+  "15": {
+    "nome": "Athletico-PR",
+    "cores": [
+      "#FF0000",
+      "#000000"
+    ],
+    "padrao": "diagonal_desce"
+  },
+  "16": {
+    "nome": "Coritiba",
+    "cores": [
+      "#00573F",
+      "#FFFFFF"
+    ],
+    "padrao": "verticais"
+  }
+}
