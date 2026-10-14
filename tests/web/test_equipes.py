@@ -197,7 +197,7 @@ def test_editar_equipe_com_valor_invalido_nao_altera_e_mostra_erro(equipes_de_te
 
 
 def _conteudo_do_save_de_teste():
-    return (Path(persistencia.DIR_SAVES) / "1_01_01_2026.json").read_bytes()
+    return (Path(persistencia.DIR_SAVES) / "1_01_01_2026.db").read_bytes()
 
 
 def test_tela_editar_equipe_com_save_mostra_o_formulario_e_o_aviso():

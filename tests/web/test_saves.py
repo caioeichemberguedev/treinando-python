@@ -1,5 +1,4 @@
 import json
-import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -167,15 +166,9 @@ def test_tela_saves_mostra_um_escudo_por_carreira():
 
 
 def test_tela_saves_save_antigo_sem_cores_usa_cores_do_catalogo():
-    """Save gravado antes do campo `cores` existir: o escudo do time
-    escolhido busca as cores pelo id no catálogo do elenco padrão."""
+    """Retrato do time escolhido sem cores no save (`cores` NULL): o
+    escudo busca as cores pelo id no catálogo do elenco padrão."""
     _criar_save("1_01_01_2026", time_escolhido=Equipe("São Paulo", id=1))
-    arquivo = os.path.join(persistencia.DIR_SAVES, "1_01_01_2026.json")
-    with open(arquivo, encoding="utf-8") as f:
-        dados = json.load(f)
-    dados["time_escolhido"].pop("cores", None)
-    with open(arquivo, "w", encoding="utf-8") as f:
-        json.dump(dados, f)
 
     resposta = client.get("/saves")
 

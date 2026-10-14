@@ -1,11 +1,13 @@
 import json
 import os
 import re
+import sqlite3
 
 import pytest
 
 import catalogo
 import persistencia
+from dados.migrar import versao_atual
 from equipe import Equipe
 
 PADRAO_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -120,27 +122,176 @@ def dir_saves(tmp_path, monkeypatch):
     return pasta
 
 
-def test_salvar_jogo_grava_a_versao_atual(dir_saves):
-    persistencia.salvar_jogo("1_01_01_2026", "Campeonato Teste", Equipe("Time A", id=901), 2026, None)
-
-    dados = json.loads((dir_saves / "1_01_01_2026.json").read_text(encoding="utf-8"))
-
-    assert persistencia.VERSAO_SAVE == 2
-    assert dados["versao"] == 2
+NOME = "1_01_01_2026"
 
 
-def test_listar_saves_ignora_save_antigo_e_json_corrompido(dir_saves):
+def _versao_do_arquivo(caminho):
+    conn = sqlite3.connect(caminho)
+    try:
+        return conn.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _criar_db_com_versao(caminho, versao):
+    conn = sqlite3.connect(caminho)
+    try:
+        conn.execute(f"PRAGMA user_version = {int(versao)}")
+    finally:
+        conn.close()
+
+
+def test_persistencia_nao_tem_mais_versao_save():
+    """A versão do save agora é o `PRAGMA user_version` do banco."""
+    assert not hasattr(persistencia, "VERSAO_SAVE")
+
+
+def test_salvar_jogo_cria_db_na_versao_atual_do_esquema(dir_saves):
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", Equipe("Time A", id=901), 2026, None)
+
+    caminho = dir_saves / f"{NOME}.db"
+    assert caminho.exists()
+    assert not (dir_saves / f"{NOME}.json").exists()
+    assert _versao_do_arquivo(caminho) == 1 == versao_atual()
+
+
+def test_salvar_e_carregar_devolve_o_mesmo_retrato(dir_saves):
+    escolhido = Equipe("Time A", financas=10, fas=20, titulos=1, forca=70, cores=["#111111"], id=901)
+    no_chaveamento = Equipe("Time A", financas=99, fas=88, titulos=1, forca=70, cores=["#111111"], id=901)
+    outro = Equipe("Time B", financas=5, fas=6, titulos=0, forca=40, cores=None, id=902)
+    historico = [
+        {"temporada": 2026, "campeao": 901, "fases": [
+            {"nome_fase": "Semifinal", "confrontos": [[901, 903, 901, 2, 1], [902, 904, 902, 0, 0]]},
+            {"nome_fase": "Final", "confrontos": [[901, 902, 901, 3, 2]]},
+        ]},
+        {"temporada": 2027, "campeao": 902, "fases": []},
+    ]
+
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2028, [outro, no_chaveamento], historico)
+    dados = persistencia.carregar_jogo_salvo(NOME)
+
+    assert set(dados) == {"campeonato", "time_escolhido", "temporada", "classificados", "historico"}
+    assert dados["campeonato"] == "Campeonato Teste"
+    assert dados["temporada"] == 2028
+    assert dados["historico"] == historico
+    assert [time.id for time in dados["classificados"]] == [902, 901]
+    time_b, time_a = dados["classificados"]
+    assert (time_b.nome, time_b.financas, time_b.fas, time_b.forca, time_b.cores) == ("Time B", 5, 6, 40, None)
+    assert (time_a.financas, time_a.fas) == (99, 88)
+    # Escolhido e classificado: iguais por id, objetos separados.
+    assert dados["time_escolhido"] == time_a
+    assert dados["time_escolhido"] is not time_a
+
+
+def test_salvar_jogo_de_novo_substitui_o_retrato(dir_saves):
     time = Equipe("Time A", id=901)
-    persistencia.salvar_jogo("1_01_01_2026", "Campeonato Teste", time, 2026, [time])
-    antigo = {"campeonato": "Campeonato Teste", "time_escolhido": time.to_dict(), "temporada": 2026,
-              "classificados": None, "historico": []}
-    (dir_saves / "2_01_01_2026.json").write_text(json.dumps(antigo), encoding="utf-8")
-    (dir_saves / "3_01_01_2026.json").write_text("{isso não é json", encoding="utf-8")
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2026, [time, Equipe("Time B", id=902)],
+                             [{"temporada": 2025, "campeao": 902, "fases": []}])
 
-    assert persistencia.listar_saves() == ["1_01_01_2026"]
-    # Nada é apagado: os arquivos ignorados continuam no disco.
-    assert os.path.exists(dir_saves / "2_01_01_2026.json")
-    assert os.path.exists(dir_saves / "3_01_01_2026.json")
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2027, None)
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+    assert dados["temporada"] == 2027
+    assert dados["classificados"] is None
+    assert dados["historico"] == []
+
+
+def test_listar_saves_ignora_invalidos_sem_apagar(dir_saves):
+    time = Equipe("Time A", id=901)
+    persistencia.salvar_jogo("10_01_01_2026", "Campeonato Teste", time, 2026, [time])
+    persistencia.salvar_jogo("2_01_01_2026", "Campeonato Teste", time, 2026, None)
+    antigo = {"versao": 2, "campeonato": "Campeonato Teste", "time_escolhido": time.to_dict(),
+              "temporada": 2026, "classificados": None, "historico": []}
+    ignorados = {
+        "3_01_01_2026.json": json.dumps(antigo).encode("utf-8"),
+        "4_01_01_2026.json": "{isso não é json".encode("utf-8"),
+        "5_01_01_2026.db": b"isto nao e um banco sqlite" * 50,
+        "6_01_01_2026.db": b"",
+    }
+    for nome, conteudo in ignorados.items():
+        (dir_saves / nome).write_bytes(conteudo)
+    _criar_db_com_versao(dir_saves / "7_01_01_2026.db", 99)
+    _criar_db_com_versao(dir_saves / "8_01_01_2026.db", 0)
+    bytes_versao_99 = (dir_saves / "7_01_01_2026.db").read_bytes()
+    bytes_versao_0 = (dir_saves / "8_01_01_2026.db").read_bytes()
+
+    assert persistencia.listar_saves() == ["2_01_01_2026", "10_01_01_2026"]
+
+    # Nada é apagado nem alterado: os arquivos ignorados continuam no disco.
+    for nome, conteudo in ignorados.items():
+        assert (dir_saves / nome).read_bytes() == conteudo
+    assert (dir_saves / "7_01_01_2026.db").read_bytes() == bytes_versao_99
+    assert (dir_saves / "8_01_01_2026.db").read_bytes() == bytes_versao_0
+    assert not any(nome.endswith("-journal") for nome in os.listdir(dir_saves))
+
+
+def test_listar_saves_sem_pasta_devolve_lista_vazia(dir_saves):
+    assert persistencia.listar_saves() == []
+    assert not dir_saves.exists()
+
+
+def test_carregar_save_inexistente_devolve_none_sem_criar_arquivo(dir_saves):
+    dir_saves.mkdir()
+
+    assert persistencia.carregar_jogo_salvo("nao_existe") is None
+
+    assert os.listdir(dir_saves) == []
+
+
+@pytest.mark.parametrize("versao", [None, 0, 99])
+def test_carregar_db_invalido_devolve_none_sem_alterar(dir_saves, versao):
+    """`None` = bytes que não são SQLite; 0 = banco vazio; 99 = versão futura."""
+    dir_saves.mkdir()
+    caminho = dir_saves / f"{NOME}.db"
+    if versao is None:
+        caminho.write_bytes(b"lixo" * 300)
+    else:
+        _criar_db_com_versao(caminho, versao)
+    conteudo = caminho.read_bytes()
+
+    assert persistencia.carregar_jogo_salvo(NOME) is None
+
+    assert caminho.read_bytes() == conteudo
+    assert os.listdir(dir_saves) == [f"{NOME}.db"]
+
+
+def test_gerar_nome_save_considera_json_antigo_e_db(dir_saves):
+    dir_saves.mkdir()
+    (dir_saves / "5_01_01_2026.json").write_text("{}", encoding="utf-8")
+    persistencia.salvar_jogo("3_01_01_2026", "Campeonato Teste", Equipe("Time A", id=901), 2026, None)
+
+    assert persistencia.gerar_nome_save().startswith("6_")
+
+
+def test_excluir_logo_depois_de_listar_e_carregar(dir_saves):
+    """Prova que nenhuma conexão ficou aberta (no Windows, impediria o
+    `os.remove`)."""
+    time = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2026, [time])
+    assert persistencia.listar_saves() == [NOME]
+    assert persistencia.carregar_jogo_salvo(NOME) is not None
+
+    assert persistencia.excluir_jogo_salvo(NOME) is True
+    assert not (dir_saves / f"{NOME}.db").exists()
+    assert persistencia.excluir_jogo_salvo(NOME) is False
+
+
+def test_excluir_remove_journal_que_sobrou(dir_saves):
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", Equipe("Time A", id=901), 2026, None)
+    (dir_saves / f"{NOME}.db-journal").write_bytes(b"")
+
+    assert persistencia.excluir_jogo_salvo(NOME) is True
+    assert os.listdir(dir_saves) == []
+
+
+def test_salvar_com_time_sem_id_nao_altera_save_anterior(dir_saves):
+    time = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2026, None)
+
+    with pytest.raises(ValueError):
+        persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2027, [Equipe("Sem Id")])
+
+    assert persistencia.carregar_jogo_salvo(NOME)["temporada"] == 2026
 
 
 # --- Catálogo do adm aplicado ao carregar (ID-008-T3) ---------------------
@@ -185,8 +336,8 @@ def test_carregar_jogo_salvo_aplica_catalogo_do_adm(dir_saves):
     sao_paulo = Equipe("São Paulo", financas=123, cores=["#E30613", "#FFFFFF", "#000000"], id=1)
     fantasma = Equipe("Time Fantasma", cores=["#111111"], id=901)
     persistencia.salvar_jogo("1_01_01_2026", "Copa do Brasil", sao_paulo, 2026, [sao_paulo, fantasma])
-    caminho = dir_saves / "1_01_01_2026.json"
-    conteudo_antes = caminho.read_text(encoding="utf-8")
+    caminho = dir_saves / "1_01_01_2026.db"
+    conteudo_antes = caminho.read_bytes()
     _renomear_sao_paulo()
 
     dados = persistencia.carregar_jogo_salvo("1_01_01_2026")
@@ -199,8 +350,9 @@ def test_carregar_jogo_salvo_aplica_catalogo_do_adm(dir_saves):
     assert (classificado_fantasma.id, classificado_fantasma.nome, classificado_fantasma.cores) == (
         901, "Time Fantasma", ["#111111"],
     )
-    # Só em memória: o save não é regravado.
-    assert caminho.read_text(encoding="utf-8") == conteudo_antes
+    # Só em memória: o save não é regravado (nem ao listar).
+    assert persistencia.listar_saves() == ["1_01_01_2026"]
+    assert caminho.read_bytes() == conteudo_antes
 
 
 def test_carregar_jogo_salvo_com_classificados_none(dir_saves):

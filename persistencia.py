@@ -1,17 +1,29 @@
+"""Persistência do jogo.
+
+- Elenco base por campeonato: `equipes.json` (JSON).
+- Carreiras salvas: um banco SQLite por carreira em
+  `saves/<numero>_<dia>_<mes>_<ano>.db`. Esta camada é a fachada: cuida do
+  nome do arquivo, da transação e do catálogo efetivo; o SQL fica em
+  `dados/` (conexão, migrações e repositórios). A versão do formato é o
+  `PRAGMA user_version` do banco (`dados.migrar`). Saves `.json` antigos
+  ficam no disco, mas fora da lista.
+"""
+
 import os
 import json
+import sqlite3
 from datetime import date
 
 import catalogo
+from dados.conexao import abrir
+from dados.migrar import migrar, versao_atual, versao_do_banco
+from dados.repositorios.carreira import gravar_carreira, ler_carreira
+from dados.repositorios.historico import gravar_historico, ler_historico
 from equipe import Equipe
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
 DIR_SAVES = os.path.join(BASE_DIR, "saves")
-
-# Versão do formato do save. A 2 guarda o histórico com ids dos times (não
-# nomes); saves sem essa versão são ignorados por `listar_saves()`.
-VERSAO_SAVE = 2
 
 
 def carregar_equipes():
@@ -77,13 +89,15 @@ def salvar_equipes(equipes):
 
 
 def _caminho_save(nome_save):
-    return os.path.join(DIR_SAVES, f"{nome_save}.json")
+    return os.path.join(DIR_SAVES, f"{nome_save}.db")
 
 
 def gerar_nome_save():
     """Gera um nome único para uma nova carreira, no formato
     "numero_dia_mes_ano" (ex.: "1_23_09_2026"), permitindo que várias
     carreiras existam salvas ao mesmo tempo e sejam distinguidas facilmente.
+    Olha o prefixo numérico de qualquer arquivo em `saves/` (inclusive
+    `.json` antigos), então nunca colide com eles.
     """
     maior_numero = 0
     if os.path.isdir(DIR_SAVES):
@@ -96,30 +110,41 @@ def gerar_nome_save():
     return f"{maior_numero + 1}_{hoje.day:02d}_{hoje.month:02d}_{hoje.year}"
 
 
-def _save_na_versao_atual(nome_save):
-    """True se o arquivo do save é um JSON válido gravado com `VERSAO_SAVE`.
-    Saves antigos (sem versão) ou corrompidos não são apagados — só ficam
-    fora da lista.
+def _banco_e_save_valido(conn):
+    """True se o banco aberto é uma carreira que o jogo sabe ler: versão
+    entre 1 e `versao_atual()` e com a linha da `carreira`. Não escreve
+    nada. Pode levantar `sqlite3.Error` (ex.: arquivo que não é banco).
+    """
+    versao = versao_do_banco(conn)
+    if not 1 <= versao <= versao_atual():
+        return False
+    return conn.execute("SELECT 1 FROM carreira WHERE id = 1").fetchone() is not None
+
+
+def _save_valido(nome_save):
+    """True se `saves/<nome>.db` é uma carreira válida. Abre só leitura:
+    não cria nem altera o arquivo. Arquivo corrompido/inválido não é
+    apagado — só fica fora da lista.
     """
     try:
-        with open(_caminho_save(nome_save), "r", encoding="utf-8") as arquivo:
-            dados = json.load(arquivo)
-    except (OSError, ValueError):
+        with abrir(_caminho_save(nome_save), somente_leitura=True) as conn:
+            return _banco_e_save_valido(conn)
+    except sqlite3.Error:
         return False
-    return isinstance(dados, dict) and dados.get("versao") == VERSAO_SAVE
 
 
 def listar_saves():
     """Lista os nomes das carreiras salvas, da mais antiga para a mais nova.
-    Só entram saves na versão atual do formato (`VERSAO_SAVE`).
+    Só entram arquivos `.db` válidos na versão atual (ou anterior) do
+    esquema; `.json` antigos e arquivos inválidos ficam de fora.
     """
     if not os.path.isdir(DIR_SAVES):
         return []
 
     nomes = [
-        nome_arquivo[:-5]
+        nome_arquivo[:-3]
         for nome_arquivo in os.listdir(DIR_SAVES)
-        if nome_arquivo.endswith(".json") and _save_na_versao_atual(nome_arquivo[:-5])
+        if nome_arquivo.endswith(".db") and _save_valido(nome_arquivo[:-3])
     ]
 
     def numero_do_save(nome):
@@ -130,46 +155,69 @@ def listar_saves():
 
 
 def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None):
-    dados = {
-        "versao": VERSAO_SAVE,
-        "campeonato": campeonato,
-        "time_escolhido": time_escolhido.to_dict(),
-        "temporada": temporada,
-        # None = temporada nova, ainda não sorteada
-        "classificados": [equipe.to_dict() for equipe in classificados] if classificados is not None else None,
-        "historico": historico or [],  # temporadas já concluídas nesta carreira
-    }
+    """Grava o retrato completo da carreira em `saves/<nome>.db`, numa
+    transação só: se der erro no meio, o save anterior fica intacto.
+
+    `classificados=None` = temporada nova, ainda não sorteada; `historico`
+    = temporadas já concluídas nesta carreira.
+    """
     os.makedirs(DIR_SAVES, exist_ok=True)
-    with open(_caminho_save(nome_save), "w", encoding="utf-8") as arquivo:
-        json.dump(dados, arquivo, ensure_ascii=False, indent=2)
+    with abrir(_caminho_save(nome_save), criar=True) as conn:
+        migrar(conn)
+        with conn:
+            gravar_carreira(conn, campeonato, temporada, time_escolhido, classificados)
+            gravar_historico(conn, historico or [])
 
 
 def carregar_jogo_salvo(nome_save):
     """Lê uma carreira salva específica e já reconstrói `time_escolhido`/
     `classificados` como objetos `Equipe`, com nome/cores do catálogo
-    efetivo (edições do adm valem também para carreiras em andamento).
-    Retorna None se não existir.
+    efetivo (edições do adm valem também para carreiras em andamento; nada
+    é regravado).
+
+    Devolve {"campeonato", "time_escolhido", "temporada", "classificados",
+    "historico"}, ou None se o save não existir ou não for válido (o
+    arquivo nunca é criado).
     """
     caminho = _caminho_save(nome_save)
     if not os.path.exists(caminho):
         return None
 
-    with open(caminho, "r", encoding="utf-8") as arquivo:
-        dados = json.load(arquivo)
+    try:
+        with abrir(caminho, criar=False) as conn:
+            if not _banco_e_save_valido(conn):
+                return None
+            migrar(conn)  # save de versão antiga se atualiza sozinho
+            carreira = ler_carreira(conn)
+            historico = ler_historico(conn)
+    except (sqlite3.Error, ValueError):
+        return None
 
-    dados["time_escolhido"] = _aplicar_catalogo(Equipe.from_dict(dados["time_escolhido"]))
-    if dados["classificados"] is not None:
-        dados["classificados"] = [
-            _aplicar_catalogo(Equipe.from_dict(item)) for item in dados["classificados"]
-        ]
+    if carreira is None:
+        return None
 
-    return dados
+    classificados = carreira["classificados"]
+    if classificados is not None:
+        classificados = [_aplicar_catalogo(equipe) for equipe in classificados]
+
+    return {
+        "campeonato": carreira["campeonato"],
+        "time_escolhido": _aplicar_catalogo(carreira["time_escolhido"]),
+        "temporada": carreira["temporada"],
+        "classificados": classificados,
+        "historico": historico,
+    }
 
 
 def excluir_jogo_salvo(nome_save):
-    """Apaga uma carreira salva específica. Retorna True se ela existia."""
+    """Apaga uma carreira salva específica (e um `-journal` que tenha
+    sobrado). Retorna True se ela existia.
+    """
     caminho = _caminho_save(nome_save)
     if not os.path.exists(caminho):
         return False
     os.remove(caminho)
+    journal = f"{caminho}-journal"
+    if os.path.exists(journal):
+        os.remove(journal)
     return True

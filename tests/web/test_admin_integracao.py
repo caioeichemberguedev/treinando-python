@@ -19,6 +19,7 @@ import catalogo
 import menu
 import persistencia
 import web.estado as estado
+from dados.conexao import abrir
 from equipe import Equipe
 from web.main import app
 
@@ -266,11 +267,11 @@ def test_arquivos_do_jogador_continuam_com_o_retrato_antigo(editado):
     não são regravados."""
     with open(persistencia.ARQUIVO_EQUIPES, encoding="utf-8") as arquivo:
         equipes = json.load(arquivo)
-    with open(persistencia._caminho_save(NOME_SAVE), encoding="utf-8") as arquivo:
-        save = json.load(arquivo)
+    with abrir(persistencia._caminho_save(NOME_SAVE), somente_leitura=True) as conn:
+        linha = conn.execute("SELECT nome FROM times WHERE id = ?", (ID_EDITADO,)).fetchone()
 
     assert equipes[CAMPEONATO][0]["nome"] == NOME_ANTIGO
-    assert save["time_escolhido"]["nome"] == NOME_ANTIGO
+    assert linha["nome"] == NOME_ANTIGO
 
 
 # --- Carreira salva carregada ---------------------------------------------------
@@ -494,8 +495,16 @@ def test_save_e_equipes_json_nao_ganham_campo_padrao(
         cliente.post("/equipes/restaurar", follow_redirects=False)
     with open(persistencia.ARQUIVO_EQUIPES, encoding="utf-8") as arquivo:
         equipes = json.load(arquivo)
-    with open(persistencia._caminho_save(NOME_SAVE), encoding="utf-8") as arquivo:
-        save = json.load(arquivo)
+    with abrir(persistencia._caminho_save(NOME_SAVE), somente_leitura=True) as conn:
+        tabelas = [
+            linha["name"]
+            for linha in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        ]
+        colunas = {
+            tabela: [coluna["name"] for coluna in conn.execute(f"PRAGMA table_info({tabela})")]
+            for tabela in tabelas
+        }
 
     assert not _tem_chave(equipes, "padrao")
-    assert not _tem_chave(save, "padrao")
+    assert "times" in colunas
+    assert not any("padrao" in nomes for nomes in colunas.values())
