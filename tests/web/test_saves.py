@@ -1,4 +1,6 @@
 import json
+import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +8,7 @@ from fastapi.testclient import TestClient
 import catalogo
 import persistencia
 import web.estado as estado
+import web.rotas.saves as saves_rotas
 from equipe import Equipe
 from web.main import app
 
@@ -190,3 +193,88 @@ def test_tela_saves_mostra_nome_do_catalogo_do_adm():
     assert "Nome Adm" in resposta.text
     assert "São Paulo" not in resposta.text
     assert "Time A" in resposta.text
+
+
+def _bytes_do_save(nome):
+    return Path(persistencia._caminho_save(nome)).read_bytes()
+
+
+def test_carregar_save_guarda_o_nome_do_save_no_estado():
+    _criar_save("1_01_01_2026")
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert estado.obter_jogo().nome_save == "1_01_01_2026"
+
+
+def test_carregar_save_no_meio_da_temporada_nao_grava_nada():
+    """Com `classificados` já preenchidos, carregar não regrava o arquivo
+    nem cria outro (paridade com `menu.carregar_jogo`)."""
+    _criar_save("1_01_01_2026", temporada=2027)
+    antes = _bytes_do_save("1_01_01_2026")
+    arquivos_antes = sorted(os.listdir(persistencia.DIR_SAVES))
+
+    resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert _bytes_do_save("1_01_01_2026") == antes
+    assert sorted(os.listdir(persistencia.DIR_SAVES)) == arquivos_antes
+    assert persistencia.listar_saves() == ["1_01_01_2026"]
+
+
+def test_carregar_save_com_classificados_none_grava_o_sorteio_no_mesmo_arquivo():
+    historico = [{"temporada": 2026, "campeao": 901, "fases": []}]
+    _criar_save("1_01_01_2026", temporada=2027, classificados=None, historico=historico)
+    arquivos_antes = sorted(os.listdir(persistencia.DIR_SAVES))
+
+    resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    jogo = estado.obter_jogo()
+    salvo = persistencia.carregar_jogo_salvo("1_01_01_2026")
+    assert salvo["classificados"] is not None
+    assert [time.id for time in salvo["classificados"]] == [time.id for time in jogo.classificados]
+    assert salvo["temporada"] == 2027
+    assert salvo["historico"] == historico
+    assert salvo["time_escolhido"].id == 901
+    assert sorted(os.listdir(persistencia.DIR_SAVES)) == arquivos_antes
+    assert persistencia.listar_saves() == ["1_01_01_2026"]
+
+
+def test_carregar_save_com_classificados_none_preserva_a_ordem_do_sorteio(monkeypatch):
+    """A ordem gravada é exatamente a do estado — força um sorteio que
+    inverte a ordem do elenco para não depender da sorte."""
+    monkeypatch.setattr(saves_rotas, "sortear_classificados", lambda times: list(reversed(times)))
+    _criar_save("1_01_01_2026", classificados=None)
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    salvo = persistencia.carregar_jogo_salvo("1_01_01_2026")
+    assert [time.id for time in estado.obter_jogo().classificados] == [902, 901]
+    assert [time.id for time in salvo["classificados"]] == [902, 901]
+
+
+def test_carregar_save_none_com_elenco_insuficiente_da_400_e_nao_grava():
+    """Sem times suficientes para sortear, o carregar falha antes de gravar:
+    o arquivo continua igual e nenhum jogo fica em andamento."""
+    _criar_save("1_01_01_2026", campeonato="Campeonato Vazio", classificados=None)
+    antes = _bytes_do_save("1_01_01_2026")
+    arquivos_antes = sorted(os.listdir(persistencia.DIR_SAVES))
+
+    resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 400
+    assert _bytes_do_save("1_01_01_2026") == antes
+    assert sorted(os.listdir(persistencia.DIR_SAVES)) == arquivos_antes
+    assert estado.obter_jogo() is None
+
+
+def test_carregar_save_inexistente_nao_cria_arquivo():
+    _criar_save("1_01_01_2026")
+    arquivos_antes = sorted(os.listdir(persistencia.DIR_SAVES))
+
+    resposta = client.post("/saves/9_01_01_2026/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 404
+    assert sorted(os.listdir(persistencia.DIR_SAVES)) == arquivos_antes
+    assert estado.obter_jogo() is None

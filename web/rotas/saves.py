@@ -2,9 +2,10 @@
 carreira específica.
 
 Espelha `escolher_save`/`carregar_jogo`/exclusão do terminal (`menu.py`).
-Carregar uma carreira COPIA os dados salvos para `web/estado.py` — nada é
-regravado em `saves/` enquanto se joga pela web (decisão do ID-001,
-reafirmada no ID-002: o "jogo em andamento" continua só em memória).
+Carregar uma carreira copia os dados salvos para `web/estado.py` junto com o
+`nome_save`, então a carreira continua sendo gravada no MESMO arquivo de
+`saves/` enquanto se joga pela web (E-018). Carregar em si só grava quando
+precisa sortear uma temporada nova, igual ao terminal.
 Excluir uma carreira é uma ação destrutiva, então passa por uma tela de
 confirmação antes do POST que efetivamente remove, do mesmo jeito que
 `web/rotas/equipes.py` já faz para restaurar o elenco padrão.
@@ -15,7 +16,7 @@ from fastapi.responses import RedirectResponse
 
 from campeonato import sortear_classificados
 from persistencia import carregar_equipes, carregar_jogo_salvo, excluir_jogo_salvo, listar_saves
-from web.estado import iniciar_jogo
+from web.estado import iniciar_jogo, salvar_jogo_em_andamento
 from web.templates_config import templates
 
 router = APIRouter(tags=["saves"])
@@ -42,9 +43,13 @@ def carregar_save(nome_save: str):
     para a fase atual (`/fase`), reaproveitando o fluxo já existente do
     ID-001.
 
+    O jogo em memória guarda o `nome_save` da URL, então as próximas
+    gravações da web vão para o mesmo arquivo em `saves/`.
+
     Quando `classificados` é `None` (temporada nova ainda não sorteada),
-    sorteia a partir do elenco base do campeonato — igual `rodar_temporada`
-    faz no terminal.
+    sorteia a partir do elenco base do campeonato e grava o sorteio no mesmo
+    arquivo — igual `rodar_temporada` faz no terminal. Com `classificados`
+    já preenchidos (carreira salva no meio da temporada), não grava nada.
 
     O roster completo do campeonato (`times`) é sempre recarregado aqui e
     guardado em `times_do_campeonato`, independente de `classificados` já vir
@@ -61,7 +66,8 @@ def carregar_save(nome_save: str):
     campeonato = dados["campeonato"]
     times = carregar_equipes().get(campeonato, [])
     classificados = dados["classificados"]
-    if classificados is None:
+    sorteou = classificados is None
+    if sorteou:
         if len(times) < 2:
             raise HTTPException(
                 status_code=400,
@@ -69,14 +75,17 @@ def carregar_save(nome_save: str):
             )
         classificados = sortear_classificados(times)
 
-    iniciar_jogo(
+    jogo = iniciar_jogo(
         campeonato,
         dados["time_escolhido"],
         dados["temporada"],
         classificados,
         historico=dados.get("historico", []),
         times_do_campeonato=times,
+        nome_save=nome_save,
     )
+    if sorteou:
+        salvar_jogo_em_andamento(jogo, jogo.temporada, jogo.classificados)
 
     return RedirectResponse(url="/fase", status_code=303)
 
