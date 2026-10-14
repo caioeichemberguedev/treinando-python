@@ -270,3 +270,124 @@ def test_fechar_fase_com_campeao_ja_coroado_nao_faz_nada():
     assert len(jogo.historico) == 1
     assert len(jogo.fases_da_temporada) == 1
     assert _bytes_do_save(jogo) == bytes_antes
+
+
+# --- E-018-T5: "Salvar e sair" ---
+
+
+def test_tela_da_fase_tem_o_botao_salvar_e_sair_e_o_nome_da_carreira():
+    jogo = _novo_jogo("Campeonato Teste", 901)
+
+    resposta = _decidir_fase_atual()
+
+    assert '<form method="post" action="http://testserver/fase/salvar-e-sair">' in resposta.text
+    assert "Salvar e sair" in resposta.text
+    assert f"Carreira: <strong>{jogo.nome_save}</strong>" in resposta.text
+
+
+def test_tela_da_fase_sem_nome_save_nao_mostra_a_carreira():
+    elenco = persistencia.carregar_equipes()["Campeonato Teste"]
+    estado.iniciar_jogo("Campeonato Teste", elenco[0], 2026, list(elenco), times_do_campeonato=elenco)
+
+    resposta = _decidir_fase_atual()
+
+    assert "Carreira:" not in resposta.text
+    assert "Salvar e sair" in resposta.text
+
+
+def test_salvar_e_sair_grava_o_retrato_encerra_o_jogo_e_vai_para_saves():
+    jogo = _novo_jogo("Copa Teste", 905)
+    _decidir_fase_atual()
+    from web.rotas.jogo import _retrato_apos_fase
+
+    temporada_esperada, proximos = _retrato_apos_fase(jogo)
+
+    resposta = client.post("/fase/salvar-e-sair", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/saves?salvo=1"
+    assert estado.obter_jogo() is None
+    dados = _save(jogo)
+    assert dados["temporada"] == temporada_esperada == 2026
+    assert _ids(dados["classificados"]) == _ids(proximos)
+    assert dados["historico"] == jogo.historico
+
+    tela = client.get("/saves?salvo=1")
+    assert tela.status_code == 200
+    assert "Progresso salvo!" in tela.text
+    assert jogo.nome_save in tela.text
+
+
+def test_continuar_depois_de_salvar_e_sair_segue_no_mesmo_arquivo():
+    jogo = _novo_jogo("Copa Teste", 905)
+    _decidir_fase_atual()
+    nome_save = jogo.nome_save
+    ids_proximos = _ids(jogo.fase_atual["proximos"])
+    client.post("/fase/salvar-e-sair")
+
+    resposta = client.post(f"/saves/{nome_save}/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    continuado = estado.obter_jogo()
+    assert continuado.nome_save == nome_save
+    assert continuado.temporada == 2026
+    assert _ids(continuado.classificados) == ids_proximos
+
+    _decidir_fase_atual()  # a final
+
+    assert continuado.campeao is not None
+    assert persistencia.listar_saves() == [nome_save]
+    dados = _save(continuado)
+    assert dados["temporada"] == 2027
+    assert dados["classificados"] is None
+
+
+def test_salvar_e_sair_na_final_grava_a_proxima_temporada_e_carregar_sorteia():
+    jogo = _novo_jogo("Campeonato Teste", 901)
+    _decidir_fase_atual()
+    nome_save = jogo.nome_save
+
+    client.post("/fase/salvar-e-sair")
+
+    dados = _save(jogo)
+    assert dados["temporada"] == 2027
+    assert dados["classificados"] is None
+    assert len(dados["historico"]) == 1
+
+    client.post(f"/saves/{nome_save}/carregar")
+
+    continuado = estado.obter_jogo()
+    assert continuado.temporada == 2027
+    assert sorted(_ids(continuado.classificados)) == [901, 902]
+    assert _ids(persistencia.carregar_jogo_salvo(nome_save)["classificados"]) == _ids(continuado.classificados)
+    assert persistencia.listar_saves() == [nome_save]
+
+
+def test_salvar_e_sair_sem_jogo_responde_404():
+    resposta = client.post("/fase/salvar-e-sair", follow_redirects=False)
+
+    assert resposta.status_code == 404
+
+
+def test_salvar_e_sair_com_confronto_pendente_responde_400():
+    jogo = _novo_jogo("Copa Teste", 905)
+    client.get("/fase", follow_redirects=False)  # monta a fase; disputa pendente
+    bytes_antes = _bytes_do_save(jogo)
+
+    resposta = client.post("/fase/salvar-e-sair", follow_redirects=False)
+
+    assert resposta.status_code == 400
+    assert estado.obter_jogo() is jogo
+    assert _bytes_do_save(jogo) == bytes_antes
+
+
+def test_salvar_e_sair_sem_nome_save_responde_400():
+    elenco = persistencia.carregar_equipes()["Campeonato Teste"]
+    estado.iniciar_jogo("Campeonato Teste", elenco[0], 2026, list(elenco), times_do_campeonato=elenco)
+    _decidir_fase_atual()
+
+    resposta = client.post("/fase/salvar-e-sair", follow_redirects=False)
+
+    assert resposta.status_code == 400
+    assert estado.obter_jogo() is not None
+    assert persistencia.listar_saves() == []

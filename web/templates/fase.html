@@ -5,6 +5,9 @@
 {% block conteudo %}
     <h1>{{ nome_fase }}</h1>
     <p>{{ campeonato }} — Temporada {{ temporada }}</p>
+    {% if nome_save %}
+        <p>Carreira: <strong>{{ nome_save }}</strong></p>
+    {% endif %}
     <p>Seu time: <strong class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</strong></p>
 
     <table>
@@ -30,5 +33,8 @@
 
     <form method="post" action="{{ url_for('avancar_fase') }}">
         <button type="submit" class="botao">Avançar fase</button>
+    </form>
+    <form method="post" action="{{ url_for('salvar_e_sair') }}">
+        <button type="submit" class="botao">Salvar e sair</button>
     </form>
 {% endblock %}

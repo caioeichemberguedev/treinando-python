@@ -278,3 +278,25 @@ def test_carregar_save_inexistente_nao_cria_arquivo():
     assert resposta.status_code == 404
     assert sorted(os.listdir(persistencia.DIR_SAVES)) == arquivos_antes
     assert estado.obter_jogo() is None
+
+
+# --- E-018-T5: mensagem do "Salvar e sair" ---
+
+
+def test_tela_saves_com_salvo_mostra_progresso_salvo():
+    _criar_save("1_01_01_2026")
+
+    resposta = client.get("/saves?salvo=1")
+
+    assert resposta.status_code == 200
+    assert "Progresso salvo!" in resposta.text
+    assert "1_01_01_2026" in resposta.text
+
+
+def test_tela_saves_sem_salvo_nao_mostra_a_mensagem():
+    _criar_save("1_01_01_2026")
+
+    resposta = client.get("/saves")
+
+    assert resposta.status_code == 200
+    assert "Progresso salvo!" not in resposta.text

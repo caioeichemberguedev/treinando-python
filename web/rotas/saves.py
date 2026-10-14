@@ -30,11 +30,15 @@ def _dados_do_save_existente(nome_save: str) -> dict:
 
 
 @router.get("/saves")
-def tela_saves(request: Request):
+def tela_saves(request: Request, salvo: bool = False):
     """Lista as carreiras salvas, com time/campeonato/temporada de cada uma
-    (mesmos detalhes exibidos por `menu.escolher_save`)."""
+    (mesmos detalhes exibidos por `menu.escolher_save`).
+
+    `?salvo=1` (vindo do "Salvar e sair" da fase) só mostra a mensagem
+    "Progresso salvo!" — não altera nada.
+    """
     saves = [{"nome": nome, **carregar_jogo_salvo(nome)} for nome in listar_saves()]
-    return templates.TemplateResponse(request, "saves.html", {"saves": saves})
+    return templates.TemplateResponse(request, "saves.html", {"saves": saves, "salvo": salvo})
 
 
 @router.post("/saves/{nome_save}/carregar")

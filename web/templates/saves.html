@@ -5,6 +5,10 @@
 {% block conteudo %}
     <h1>Carreiras salvas</h1>
 
+    {% if salvo %}
+        <p><strong>Progresso salvo!</strong> Use "Continuar" para voltar a esta carreira depois.</p>
+    {% endif %}
+
     {% if not saves %}
         <p>Nenhuma carreira salva encontrada.</p>
     {% else %}

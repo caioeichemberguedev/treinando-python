@@ -9,7 +9,8 @@ demais confrontos da fase continuam resolvidos automaticamente
 Gravação da carreira (E-018), nos mesmos momentos do terminal e sempre via
 `web.estado.salvar_jogo_em_andamento`: no novo jogo, quando a fase fica
 decidida (`_fechar_fase` — a final já coroa o campeão e grava a próxima
-temporada) e ao seguir para a próxima temporada. "Avançar fase" só navega.
+temporada) e ao seguir para a próxima temporada. "Avançar fase" só navega;
+"Salvar e sair" grava o mesmo retrato e encerra o jogo em memória.
 """
 
 from typing import Annotated
@@ -21,7 +22,7 @@ from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classif
 from penaltis import CANTOS, cobranca_time_a, cobranca_time_b, criar_disputa
 from equipe import Equipe
 from persistencia import carregar_equipes, gerar_nome_save
-from web.estado import EstadoJogo, iniciar_jogo, obter_jogo, salvar_jogo_em_andamento
+from web.estado import EstadoJogo, encerrar_jogo, iniciar_jogo, obter_jogo, salvar_jogo_em_andamento
 from web.templates_config import templates
 
 router = APIRouter(tags=["jogo"])
@@ -175,6 +176,7 @@ def tela_fase(request: Request):
             "time_escolhido": jogo.time_escolhido,
             "nome_fase": jogo.fase_atual["nome_fase"],
             "confrontos": jogo.fase_atual["confrontos"],
+            "nome_save": jogo.nome_save,
         },
     )
 
@@ -352,6 +354,36 @@ def avancar_fase():
         return RedirectResponse(url="/campeao", status_code=303)
 
     return RedirectResponse(url="/fase", status_code=303)
+
+
+@router.post("/fase/salvar-e-sair")
+def salvar_e_sair():
+    """"Salvar e sair" da tela da fase decidida: grava de novo o retrato do
+    "depois" (`_retrato_apos_fase` — o mesmo da gravação automática, então
+    é idempotente), encerra o jogo em memória (como o terminal volta ao
+    menu) e segue pra `/saves?salvo=1`, que mostra "Progresso salvo!".
+
+    Sem jogo/fase → 404; confronto do jogador pendente → 400 (salvar no meio
+    dos pênaltis está fora do escopo); jogo sem `nome_save` (só em memória)
+    → 400.
+    """
+    jogo = obter_jogo()
+    if jogo is None or jogo.fase_atual is None:
+        raise HTTPException(status_code=404, detail="Nenhuma fase em andamento pra salvar.")
+
+    if jogo.fase_atual["confronto_pendente"] is not None:
+        raise HTTPException(
+            status_code=400, detail="Ainda falta decidir a disputa de pênaltis do seu time nesta fase."
+        )
+
+    if jogo.nome_save is None:
+        raise HTTPException(status_code=400, detail="Este jogo não está ligado a nenhuma carreira salva.")
+
+    temporada, classificados = _retrato_apos_fase(jogo)
+    salvar_jogo_em_andamento(jogo, temporada, classificados)
+    encerrar_jogo()
+
+    return RedirectResponse(url="/saves?salvo=1", status_code=303)
 
 
 @router.get("/campeao")
