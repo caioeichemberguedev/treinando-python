@@ -1,13 +1,17 @@
 """Estado do "jogo em andamento" na versão web, guardado em memória.
 
-Diferente do terminal (uma carreira por arquivo em `saves/`), esta fatia da
-web ainda não persiste em disco — decisão do Caio registrada no backlog
-(ID-001): um único jogo em andamento por vez no servidor, perdido se ele
-reiniciar. É suficiente pra rodar local, sem login nem múltiplos jogadores.
+Um único jogo em andamento por vez no servidor (ID-001), sem login nem
+múltiplos jogadores. Desde o E-018, a carreira também é gravada em `saves/`
+como no terminal: o `EstadoJogo` guarda o `nome_save` do arquivo e
+`salvar_jogo_em_andamento` é o único ponto da web que grava (as rotas nunca
+chamam `persistencia.salvar_jogo` direto). Se o servidor reiniciar, o jogo
+em memória se perde, mas a carreira continua em `saves/` até a última
+gravação.
 """
 
 from dataclasses import dataclass, field
 
+import persistencia
 from equipe import Equipe
 
 
@@ -50,6 +54,11 @@ class EstadoJogo:
     save cujo `classificados` já veio como objetos `Equipe` reconstruídos à
     parte — mesmo split de identidade que já existe hoje entre
     `dados["classificados"]` e `equipes[campeonato]` em `menu.carregar_jogo`).
+
+    `nome_save` é o nome do arquivo da carreira em `saves/` (sem extensão):
+    gerado por `persistencia.gerar_nome_save()` num jogo novo, ou o do save
+    carregado. `None` só em estado montado à mão (testes) — jogo só em
+    memória, que `salvar_jogo_em_andamento` nunca grava.
     """
 
     campeonato: str
@@ -62,6 +71,7 @@ class EstadoJogo:
     campeao: Equipe | None = None
     historico: list = field(default_factory=list)
     times_do_campeonato: list[Equipe] = field(default_factory=list)
+    nome_save: str | None = None
 
 
 _jogo_atual: EstadoJogo | None = None
@@ -74,6 +84,7 @@ def iniciar_jogo(
     classificados: list[Equipe],
     historico: list | None = None,
     times_do_campeonato: list[Equipe] | None = None,
+    nome_save: str | None = None,
 ) -> EstadoJogo:
     """Cria um novo jogo em andamento, substituindo o anterior (se houver).
 
@@ -81,6 +92,7 @@ def iniciar_jogo(
     referência) — a lista em si nunca é a mesma recebida pelo chamador,
     embora os objetos `Equipe` dentro de `times_do_campeonato` continuem
     sendo os mesmos (por identidade) que os de `classificados`, de propósito.
+    `nome_save` amarra o jogo ao arquivo da carreira em `saves/`.
     """
     global _jogo_atual
     _jogo_atual = EstadoJogo(
@@ -90,6 +102,7 @@ def iniciar_jogo(
         classificados=classificados,
         historico=list(historico) if historico is not None else [],
         times_do_campeonato=list(times_do_campeonato) if times_do_campeonato is not None else [],
+        nome_save=nome_save,
     )
     return _jogo_atual
 
@@ -97,3 +110,38 @@ def iniciar_jogo(
 def obter_jogo() -> EstadoJogo | None:
     """Retorna o jogo em andamento atual, ou `None` se nenhum foi iniciado."""
     return _jogo_atual
+
+
+def encerrar_jogo() -> None:
+    """Encerra o jogo em andamento (ex.: "Salvar e sair"): depois disso,
+    `obter_jogo()` devolve `None`. Não grava nada em `saves/`."""
+    global _jogo_atual
+    _jogo_atual = None
+
+
+def salvar_jogo_em_andamento(
+    jogo: EstadoJogo,
+    temporada: int,
+    classificados: list[Equipe] | None,
+) -> None:
+    """Grava a carreira de `jogo` em `saves/<jogo.nome_save>.db`.
+
+    `temporada` e `classificados` vêm por parâmetro (e não de `jogo`) porque,
+    com a fase decidida, o retrato gravado é o "depois" — a próxima
+    temporada, ou os classificados que avançam —, enquanto o `jogo` ainda
+    guarda os da tela atual, igual ao terminal. `classificados=None` =
+    temporada nova, ainda não sorteada. Campeonato, time escolhido e
+    histórico vêm do `jogo`.
+
+    Não faz nada se `jogo.nome_save` for `None` (jogo só em memória).
+    """
+    if jogo.nome_save is None:
+        return
+    persistencia.salvar_jogo(
+        jogo.nome_save,
+        jogo.campeonato,
+        jogo.time_escolhido,
+        temporada,
+        classificados,
+        jogo.historico,
+    )
