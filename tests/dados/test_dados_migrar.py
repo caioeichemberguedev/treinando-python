@@ -146,3 +146,13 @@ def test_banco_mais_novo_que_o_jogo_da_value_error(banco, pasta_migracoes):
 def test_fixture_conn_esta_migrada_ate_a_versao_atual(conn):
     assert versao_do_banco(conn) == versao_atual()
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+
+
+def test_migrar_real_do_zero_cria_as_seis_tabelas_da_001(banco):
+    """Com a pasta real `dados/migracoes/`: do zero até a versão 1 (E-013)."""
+    assert versao_atual() == 1
+    migrar(banco)
+    assert versao_do_banco(banco) == versao_atual() == 1
+    assert _tabelas(banco) == [
+        "carreira", "classificados", "confrontos", "fases", "temporadas", "times",
+    ]
