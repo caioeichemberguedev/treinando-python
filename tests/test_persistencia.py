@@ -152,7 +152,7 @@ def test_salvar_jogo_cria_db_na_versao_atual_do_esquema(dir_saves):
     caminho = dir_saves / f"{NOME}.db"
     assert caminho.exists()
     assert not (dir_saves / f"{NOME}.json").exists()
-    assert _versao_do_arquivo(caminho) == 1 == versao_atual()
+    assert _versao_do_arquivo(caminho) == 2 == versao_atual()
 
 
 def test_salvar_e_carregar_devolve_o_mesmo_retrato(dir_saves):

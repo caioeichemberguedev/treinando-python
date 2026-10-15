@@ -193,13 +193,15 @@ def test_fixture_conn_esta_migrada_ate_a_versao_atual(conn):
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
 
 
-def test_migrar_real_do_zero_cria_as_seis_tabelas_da_001(banco):
-    """Com a pasta real `dados/migracoes/`: do zero até a versão 1 (E-013)."""
-    assert versao_atual() == 1
+def test_migrar_real_do_zero_cria_as_oito_tabelas_ate_a_002(banco):
+    """Com a pasta real `dados/migracoes/`: do zero até a versão 2 (E-013 +
+    fases em andamento do E-014)."""
+    assert versao_atual() == 2
     migrar(banco)
-    assert versao_do_banco(banco) == versao_atual() == 1
+    assert versao_do_banco(banco) == versao_atual() == 2
     assert _tabelas(banco) == [
-        "carreira", "classificados", "confrontos", "fases", "temporadas", "times",
+        "carreira", "classificados", "confrontos", "confrontos_em_andamento",
+        "fases", "fases_em_andamento", "temporadas", "times",
     ]
 
 

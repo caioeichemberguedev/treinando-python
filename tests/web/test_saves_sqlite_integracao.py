@@ -15,6 +15,7 @@ import menu
 import persistencia
 import web.estado as estado
 from dados.conexao import abrir
+from dados.migrar import versao_atual
 from web.main import app
 
 client = TestClient(app)
@@ -62,7 +63,7 @@ def test_carreira_do_terminal_salva_no_meio_e_carregada_pela_web(monkeypatch):
     assert dados["temporada"] == 2026
     assert dados["historico"] == []
     with abrir(caminho, somente_leitura=True) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == versao_atual()
     bytes_antes = Path(caminho).read_bytes()
 
     resposta = client.get("/saves")

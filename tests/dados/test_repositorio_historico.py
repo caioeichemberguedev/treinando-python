@@ -1,4 +1,4 @@
-"""Testes de `dados.repositorios.historico` (E-013-T4)."""
+"""Testes de `dados.repositorios.historico` (E-013-T4; fases em andamento E-014-T2)."""
 
 import copy
 import inspect
@@ -8,7 +8,12 @@ import sqlite3
 import pytest
 
 from dados.repositorios import historico as repo_historico
-from dados.repositorios.historico import gravar_historico, ler_historico
+from dados.repositorios.historico import (
+    gravar_fases_em_andamento,
+    gravar_historico,
+    ler_fases_em_andamento,
+    ler_historico,
+)
 
 # Mesmo histórico de 2 temporadas de tests/web/test_admin_integracao.py.
 HISTORICO = [
@@ -258,5 +263,120 @@ def test_ler_historico_nao_abre_transacao(conn):
         gravar_historico(conn, HISTORICO)
 
     ler_historico(conn)
+
+    assert not conn.in_transaction
+
+
+# --- Fases da temporada em andamento (E-014-T2) ---
+
+FASES_EM_ANDAMENTO = [
+    {"nome_fase": "Oitavas de final - Copa do Brasil",
+     "confrontos": [[16 - i, i + 1, 16 - i, i, 15 - i] for i in range(8)]},
+    {"nome_fase": "Quartas de final - Copa do Brasil",
+     "confrontos": [[16, 2, 2, 3, 4], [14, 4, 14, 1, 0],
+                    [12, 6, 6, 2, 3], [10, 8, 10, 5, 4]]},
+]
+
+
+def test_fases_em_andamento_ida_e_volta(conn):
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    lido = ler_fases_em_andamento(conn)
+
+    assert lido == FASES_EM_ANDAMENTO
+    for fase in lido:
+        assert type(fase["confrontos"]) is list
+        assert all(type(confronto) is list for confronto in fase["confrontos"])
+        assert all(type(v) is int for confronto in fase["confrontos"] for v in confronto)
+
+
+def test_fases_em_andamento_banco_sem_fases_le_lista_vazia(conn):
+    assert ler_fases_em_andamento(conn) == []
+
+
+def test_fases_em_andamento_regravar_substitui_sem_duplicar(conn):
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO[:1])
+    semi = {"nome_fase": "Semifinal - Copa do Brasil",
+            "confrontos": [[2, 14, 14, 0, 1], [6, 10, 6, 7, 6]]}
+    novas = copy.deepcopy(FASES_EM_ANDAMENTO) + [semi]
+
+    gravar_fases_em_andamento(conn, novas)
+
+    assert _contar(conn, "fases_em_andamento") == 3
+    assert _contar(conn, "confrontos_em_andamento") == 14
+    assert ler_fases_em_andamento(conn) == novas
+
+
+def test_fases_em_andamento_lista_vazia_apaga_tudo(conn):
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    gravar_fases_em_andamento(conn, [])
+
+    assert _contar(conn, "fases_em_andamento") == 0
+    assert _contar(conn, "confrontos_em_andamento") == 0
+    assert ler_fases_em_andamento(conn) == []
+
+
+def test_fases_em_andamento_ordem_e_a_da_lista(conn):
+    invertidas = list(reversed(copy.deepcopy(FASES_EM_ANDAMENTO)))
+
+    gravar_fases_em_andamento(conn, invertidas)
+
+    assert ler_fases_em_andamento(conn) == invertidas
+
+
+def test_fases_em_andamento_fase_sem_confrontos_volta_igual(conn):
+    fases = [{"nome_fase": "Oitavas de final", "confrontos": []}]
+
+    gravar_fases_em_andamento(conn, fases)
+
+    assert ler_fases_em_andamento(conn) == fases
+
+
+def test_fases_em_andamento_e_historico_sao_independentes(conn):
+    gravar_historico(conn, HISTORICO)
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    gravar_fases_em_andamento(conn, [])
+    assert ler_historico(conn) == HISTORICO
+
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+    gravar_historico(conn, [])
+    assert ler_fases_em_andamento(conn) == FASES_EM_ANDAMENTO
+
+
+def test_fases_em_andamento_confronto_invalido_falha_e_mantem_anterior(conn):
+    with conn:
+        gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+    invalidas = [{"nome_fase": "Semifinal", "confrontos": [[2, 14, 9, 0, 1]]}]
+
+    with pytest.raises(sqlite3.IntegrityError):
+        with conn:
+            gravar_fases_em_andamento(conn, invalidas)
+
+    assert ler_fases_em_andamento(conn) == FASES_EM_ANDAMENTO
+
+
+def test_gravar_fases_em_andamento_nao_faz_commit(conn):
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    assert conn.in_transaction
+    conn.rollback()
+    assert ler_fases_em_andamento(conn) == []
+
+
+def test_gravar_fases_em_andamento_nao_altera_a_lista_recebida(conn):
+    original = copy.deepcopy(FASES_EM_ANDAMENTO)
+
+    gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    assert FASES_EM_ANDAMENTO == original
+
+
+def test_ler_fases_em_andamento_nao_abre_transacao(conn):
+    with conn:
+        gravar_fases_em_andamento(conn, FASES_EM_ANDAMENTO)
+
+    ler_fases_em_andamento(conn)
 
     assert not conn.in_transaction

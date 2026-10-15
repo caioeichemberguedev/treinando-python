@@ -6,11 +6,43 @@ O histórico em memória (terminal e web) tem o formato:
       "fases": [{"nome_fase": "Final - Copa do Brasil",
                  "confrontos": [[id_a, id_b, id_vencedor, gols_a, gols_b]]}]}]
 
-Aqui ele vira três tabelas ligadas por chave estrangeira. As funções não
-fazem commit: quem chama decide a transação (`with conn:`).
+Aqui ele vira três tabelas ligadas por chave estrangeira.
+
+As fases já jogadas da temporada em andamento (E-014, migração 002) usam o
+mesmo formato de `historico[i]["fases"]` e ficam em duas tabelas à parte,
+`fases_em_andamento` → `confrontos_em_andamento`
+(`gravar_fases_em_andamento`/`ler_fases_em_andamento`).
+
+As funções não fazem commit: quem chama decide a transação (`with conn:`).
 """
 
 import sqlite3
+
+_INSERIR_CONFRONTO = (
+    "INSERT INTO confrontos "
+    "(fase_id, ordem, time_a_id, time_b_id, vencedor_id, gols_a, gols_b) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?)"
+)
+_INSERIR_CONFRONTO_EM_ANDAMENTO = (
+    "INSERT INTO confrontos_em_andamento "
+    "(fase_id, ordem, time_a_id, time_b_id, vencedor_id, gols_a, gols_b) "
+    "VALUES (?, ?, ?, ?, ?, ?, ?)"
+)
+
+
+def _inserir_confrontos(conn: sqlite3.Connection, sql: str, fase_id: int,
+                        confrontos: list) -> None:
+    """Insere os confrontos de uma fase com `ordem` 1..N.
+
+    `sql` é sempre uma das constantes `_INSERIR_CONFRONTO*` deste módulo.
+    """
+    conn.executemany(
+        sql,
+        [
+            (fase_id, ordem_confronto, *confronto)
+            for ordem_confronto, confronto in enumerate(confrontos, start=1)
+        ],
+    )
 
 
 def gravar_historico(conn: sqlite3.Connection, historico: list[dict]) -> None:
@@ -33,15 +65,8 @@ def gravar_historico(conn: sqlite3.Connection, historico: list[dict]) -> None:
                 "INSERT INTO fases (temporada_id, ordem, nome) VALUES (?, ?, ?)",
                 (temporada_id, ordem_fase, fase["nome_fase"]),
             )
-            fase_id = cursor.lastrowid
-            conn.executemany(
-                "INSERT INTO confrontos "
-                "(fase_id, ordem, time_a_id, time_b_id, vencedor_id, gols_a, gols_b) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (fase_id, ordem_confronto, *confronto)
-                    for ordem_confronto, confronto in enumerate(fase["confrontos"], start=1)
-                ],
+            _inserir_confrontos(
+                conn, _INSERIR_CONFRONTO, cursor.lastrowid, fase["confrontos"]
             )
 
 
@@ -78,3 +103,45 @@ def ler_historico(conn: sqlite3.Connection) -> list[dict]:
             "fases": fases,
         })
     return historico
+
+
+def gravar_fases_em_andamento(conn: sqlite3.Connection, fases: list[dict]) -> None:
+    """Substitui as fases gravadas da temporada em andamento por `fases`
+    (retrato completo, mesmo formato de `historico[i]["fases"]`).
+
+    Apaga todas as fases em andamento — o `ON DELETE CASCADE` leva junto os
+    confrontos — e reinsere na ordem da lista (`ordem` 1..N). Lista vazia
+    só apaga.
+    """
+    conn.execute("DELETE FROM fases_em_andamento")
+    for ordem_fase, fase in enumerate(fases, start=1):
+        cursor = conn.execute(
+            "INSERT INTO fases_em_andamento (ordem, nome) VALUES (?, ?)",
+            (ordem_fase, fase["nome_fase"]),
+        )
+        _inserir_confrontos(
+            conn, _INSERIR_CONFRONTO_EM_ANDAMENTO, cursor.lastrowid,
+            fase["confrontos"],
+        )
+
+
+def ler_fases_em_andamento(conn: sqlite3.Connection) -> list[dict]:
+    """Lê as fases da temporada em andamento pela `ordem`, no mesmo formato
+    de `ler_historico()[i]["fases"]` (confrontos como listas). Sem fases
+    gravadas → `[]`.
+    """
+    fases = []
+    linhas_fases = conn.execute(
+        "SELECT id, nome FROM fases_em_andamento ORDER BY ordem"
+    ).fetchall()
+    for linha_fase in linhas_fases:
+        linhas_confrontos = conn.execute(
+            "SELECT time_a_id, time_b_id, vencedor_id, gols_a, gols_b "
+            "FROM confrontos_em_andamento WHERE fase_id = ? ORDER BY ordem",
+            (linha_fase["id"],),
+        ).fetchall()
+        fases.append({
+            "nome_fase": linha_fase["nome"],
+            "confrontos": [list(linha) for linha in linhas_confrontos],
+        })
+    return fases
