@@ -1,13 +1,17 @@
 import json
 import os
 import re
+import shutil
 import sqlite3
 
 import pytest
 
 import catalogo
 import persistencia
-from dados.migrar import versao_atual
+from dados.conexao import abrir
+from dados.migrar import PASTA_MIGRACOES, migrar, versao_atual
+from dados.repositorios.carreira import gravar_carreira
+from dados.repositorios.historico import gravar_historico
 from equipe import Equipe
 
 PADRAO_HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -170,7 +174,9 @@ def test_salvar_e_carregar_devolve_o_mesmo_retrato(dir_saves):
     persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2028, [outro, no_chaveamento], historico)
     dados = persistencia.carregar_jogo_salvo(NOME)
 
-    assert set(dados) == {"campeonato", "time_escolhido", "temporada", "classificados", "historico"}
+    assert set(dados) == {
+        "campeonato", "time_escolhido", "temporada", "classificados", "historico", "fases_da_temporada",
+    }
     assert dados["campeonato"] == "Campeonato Teste"
     assert dados["temporada"] == 2028
     assert dados["historico"] == historico
@@ -291,6 +297,168 @@ def test_salvar_com_time_sem_id_nao_altera_save_anterior(dir_saves):
         persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2027, [Equipe("Sem Id")])
 
     assert persistencia.carregar_jogo_salvo(NOME)["temporada"] == 2026
+
+
+# --- Fases da temporada em andamento (E-014-T3) ----------------------------
+
+FASES_EM_ANDAMENTO = [
+    {"nome_fase": "Oitavas de final", "confrontos": [
+        [901, 902, 902, 1, 2], [903, 904, 903, 5, 4], [905, 906, 906, 0, 1], [907, 908, 907, 3, 0],
+    ]},
+    {"nome_fase": "Quartas de final", "confrontos": [[902, 903, 903, 2, 3], [906, 907, 906, 1, 0]]},
+]
+
+
+def _classificados_das_semis():
+    return [Equipe("Time C", id=903), Equipe("Time F", id=906)]
+
+
+def test_salvar_e_carregar_fases_da_temporada_ida_e_volta(dir_saves):
+    escolhido = Equipe("Time A", id=901)
+    historico = [{"temporada": 2026, "campeao": 902, "fases": []}]
+
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             historico, FASES_EM_ANDAMENTO)
+    dados = persistencia.carregar_jogo_salvo(NOME)
+
+    assert dados["fases_da_temporada"] == FASES_EM_ANDAMENTO
+    assert [fase["nome_fase"] for fase in dados["fases_da_temporada"]] == ["Oitavas de final", "Quartas de final"]
+    assert dados["historico"] == historico
+    # Só ids (int), como no histórico: serializa em JSON sem perder nada.
+    assert json.loads(json.dumps(dados["fases_da_temporada"])) == FASES_EM_ANDAMENTO
+
+
+def test_salvar_sem_fases_carrega_lista_vazia(dir_saves):
+    time = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", time, 2026, [time])
+
+    assert persistencia.carregar_jogo_salvo(NOME)["fases_da_temporada"] == []
+
+
+@pytest.mark.parametrize("fases_novas", [None, []])
+def test_regravar_sem_fases_apaga_as_anteriores(dir_saves, fases_novas):
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO)
+
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, fases_novas)
+
+    assert persistencia.carregar_jogo_salvo(NOME)["fases_da_temporada"] == []
+
+
+def test_regravar_com_menos_fases_substitui(dir_saves):
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO)
+
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO[:1])
+
+    assert persistencia.carregar_jogo_salvo(NOME)["fases_da_temporada"] == FASES_EM_ANDAMENTO[:1]
+
+
+def test_classificados_none_com_fases_da_value_error_sem_alterar_save(dir_saves):
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO)
+    caminho = dir_saves / f"{NOME}.db"
+    bytes_antes = caminho.read_bytes()
+
+    with pytest.raises(ValueError):
+        persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2028, None, None, FASES_EM_ANDAMENTO)
+
+    assert caminho.read_bytes() == bytes_antes
+    assert not (dir_saves / f"{NOME}.db-journal").exists()
+
+
+def test_classificados_none_com_fases_nao_cria_arquivo(dir_saves):
+    with pytest.raises(ValueError):
+        persistencia.salvar_jogo(NOME, "Campeonato Teste", Equipe("Time A", id=901), 2026, None, None,
+                                 FASES_EM_ANDAMENTO)
+
+    assert not (dir_saves / f"{NOME}.db").exists()
+
+
+def test_save_na_versao_1_carrega_sem_fases_e_sai_migrado(dir_saves, tmp_path):
+    """Save gravado por uma versão antiga do jogo (só a 001): carrega com
+    `fases_da_temporada == []` e o arquivo passa para a versão 2."""
+    pasta_v1 = tmp_path / "migracoes_v1"
+    pasta_v1.mkdir()
+    shutil.copy(PASTA_MIGRACOES / "001_inicial.sql", pasta_v1 / "001_inicial.sql")
+    dir_saves.mkdir()
+    caminho = dir_saves / f"{NOME}.db"
+    escolhido = Equipe("Time A", id=901)
+    historico = [{"temporada": 2026, "campeao": 901, "fases": [
+        {"nome_fase": "Final", "confrontos": [[901, 902, 901, 2, 0]]},
+    ]}]
+    with abrir(str(caminho), criar=True) as conn:
+        migrar(conn, pasta_v1)
+        with conn:
+            gravar_carreira(conn, "Campeonato Teste", 2027, escolhido, [escolhido, Equipe("Time B", id=902)])
+            gravar_historico(conn, historico)
+    assert _versao_do_arquivo(caminho) == 1
+    assert persistencia.listar_saves() == [NOME]
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+
+    assert dados["fases_da_temporada"] == []
+    assert dados["historico"] == historico
+    assert dados["temporada"] == 2027
+    assert _versao_do_arquivo(caminho) == 2 == versao_atual()
+
+
+def test_classificados_none_com_fases_vazias_e_aceito(dir_saves):
+    """Temporada nova (classificados=None) com `[]` não é erro: grava e lê `[]`."""
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO)
+
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2028, None, None, [])
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+    assert dados["classificados"] is None
+    assert dados["fases_da_temporada"] == []
+
+
+def test_save_travado_com_fases_mantem_as_fases_anteriores(dir_saves, monkeypatch):
+    from dados import conexao
+
+    monkeypatch.setattr(conexao, "TIMEOUT_SEGUNDOS", 0.1)
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO[:1])
+    caminho = persistencia._caminho_save(NOME)
+
+    with abrir(caminho, criar=False) as outra:
+        outra.execute("BEGIN EXCLUSIVE")
+        with pytest.raises(persistencia.SaveTravado) as erro:
+            persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                                     None, FASES_EM_ANDAMENTO)
+        outra.rollback()
+
+    assert isinstance(erro.value.__cause__, sqlite3.OperationalError)
+    assert persistencia.carregar_jogo_salvo(NOME)["fases_da_temporada"] == FASES_EM_ANDAMENTO[:1]
+
+
+def test_erro_ao_gravar_fases_desfaz_a_transacao_inteira(dir_saves, monkeypatch):
+    escolhido = Equipe("Time A", id=901)
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2027, _classificados_das_semis(),
+                             None, FASES_EM_ANDAMENTO[:1])
+
+    def gravar_com_erro(*args, **kwargs):
+        raise sqlite3.IntegrityError("falha simulada")
+
+    with monkeypatch.context() as mp:
+        mp.setattr(persistencia, "gravar_fases_em_andamento", gravar_com_erro)
+        with pytest.raises(sqlite3.IntegrityError):
+            persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2099, _classificados_das_semis(),
+                                     [{"temporada": 2026, "campeao": 903, "fases": []}], FASES_EM_ANDAMENTO)
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+    assert dados["temporada"] == 2027
+    assert dados["historico"] == []
+    assert dados["fases_da_temporada"] == FASES_EM_ANDAMENTO[:1]
 
 
 # --- Catálogo do adm aplicado ao carregar (ID-008-T3) ---------------------

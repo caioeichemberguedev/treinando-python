@@ -6,7 +6,9 @@
   nome do arquivo, da transação e do catálogo efetivo; o SQL fica em
   `dados/` (conexão, migrações e repositórios). A versão do formato é o
   `PRAGMA user_version` do banco (`dados.migrar`). Saves `.json` antigos
-  ficam no disco, mas fora da lista.
+  ficam no disco, mas fora da lista. Além do histórico das temporadas
+  concluídas, o save guarda as fases já jogadas da temporada em andamento
+  (E-014), no mesmo formato de `historico[i]["fases"]`.
 """
 
 import os
@@ -19,7 +21,12 @@ from campeonato import unificar_time_escolhido
 from dados.conexao import abrir
 from dados.migrar import migrar, versao_atual, versao_do_banco
 from dados.repositorios.carreira import gravar_carreira, ler_carreira
-from dados.repositorios.historico import gravar_historico, ler_historico
+from dados.repositorios.historico import (
+    gravar_fases_em_andamento,
+    gravar_historico,
+    ler_fases_em_andamento,
+    ler_historico,
+)
 from equipe import Equipe
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -173,17 +180,30 @@ def listar_saves():
     return sorted(nomes, key=numero_do_save)
 
 
-def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None):
+def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None,
+                fases_da_temporada=None):
     """Grava o retrato completo da carreira em `saves/<nome>.db`, numa
     transação só: se der erro no meio, o save anterior fica intacto.
 
     `classificados=None` = temporada nova, ainda não sorteada; `historico`
-    = temporadas já concluídas nesta carreira.
+    = temporadas já concluídas nesta carreira; `fases_da_temporada` = fases
+    já fechadas da temporada em andamento (mesmo formato de
+    `historico[i]["fases"]`, E-014). `None`/`[]` apaga as gravadas antes.
+
+    Levanta `ValueError` antes de tocar no arquivo se `classificados` for
+    `None` com fases não vazias (temporada não sorteada não tem fases
+    jogadas).
 
     Levanta `SaveTravado` (com o `sqlite3.OperationalError` original em
     `__cause__`) se o arquivo estiver em uso por outra conexão além do
     timeout; qualquer outro erro sobe intacto.
     """
+    fases_da_temporada = fases_da_temporada or []
+    if classificados is None and fases_da_temporada:
+        raise ValueError(
+            "Temporada ainda não sorteada (classificados=None) não pode ter fases jogadas."
+        )
+
     os.makedirs(DIR_SAVES, exist_ok=True)
     try:
         with abrir(_caminho_save(nome_save), criar=True) as conn:
@@ -191,6 +211,7 @@ def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados,
             with conn:
                 gravar_carreira(conn, campeonato, temporada, time_escolhido, classificados)
                 gravar_historico(conn, historico or [])
+                gravar_fases_em_andamento(conn, fases_da_temporada)
     except sqlite3.OperationalError as erro:
         if _erro_de_trava(erro):
             raise SaveTravado(MENSAGEM_SAVE_TRAVADO) from erro
@@ -220,7 +241,8 @@ def carregar_jogo_salvo(nome_save):
     próprios desta carreira.
 
     Devolve {"campeonato", "time_escolhido", "temporada", "classificados",
-    "historico"}, ou None se o save não existir ou não for válido (o
+    "historico", "fases_da_temporada"} (`fases_da_temporada` = fases já
+    jogadas da temporada em andamento, `[]` em save antigo), ou None se o save não existir ou não for válido (o
     arquivo nunca é criado).
     """
     caminho = _caminho_save(nome_save)
@@ -234,6 +256,7 @@ def carregar_jogo_salvo(nome_save):
             migrar(conn)  # save de versão antiga se atualiza sozinho
             carreira = ler_carreira(conn)
             historico = ler_historico(conn)
+            fases_da_temporada = ler_fases_em_andamento(conn)
     except (sqlite3.Error, ValueError):
         return None
 
@@ -253,6 +276,7 @@ def carregar_jogo_salvo(nome_save):
         "temporada": carreira["temporada"],
         "classificados": classificados,
         "historico": historico,
+        "fases_da_temporada": fases_da_temporada,
     }
 
 
