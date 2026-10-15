@@ -167,7 +167,7 @@ def test_fase_decidida_sem_seguir_calcula_sobre_os_proximos():
     _assert_mostra_so_o_adversario(html, jogo, adversario)
 
 
-def test_depois_de_avancar_mostra_o_par_real_da_proxima_fase():
+def test_depois_de_seguir_mostra_o_par_real_da_proxima_fase():
     jogo = _novo_jogo_com_fase_decidida(jogador_vence=True)
     client.post("/fase/seguir", follow_redirects=False)
 
@@ -199,7 +199,7 @@ def test_eliminado_mostra_a_fase_da_derrota():
     assert f"{nome_da_fase(4)} - Copa Teste" not in html
 
 
-def test_eliminado_depois_de_avancar_continua_mostrando_a_fase_e_o_link():
+def test_eliminado_depois_de_seguir_continua_mostrando_a_fase_e_o_link():
     _novo_jogo_com_fase_decidida(jogador_vence=False)
     client.post("/fase/seguir", follow_redirects=False)
 
