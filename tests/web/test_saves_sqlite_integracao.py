@@ -6,6 +6,7 @@ real e o `equipes.json` real nunca são tocados.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -62,7 +63,7 @@ def test_carreira_do_terminal_salva_no_meio_e_carregada_pela_web(monkeypatch):
     assert dados["historico"] == []
     with abrir(caminho, somente_leitura=True) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
-    bytes_antes = open(caminho, "rb").read()
+    bytes_antes = Path(caminho).read_bytes()
 
     resposta = client.get("/saves")
     assert resposta.status_code == 200
@@ -80,7 +81,7 @@ def test_carreira_do_terminal_salva_no_meio_e_carregada_pela_web(monkeypatch):
     # Listar/carregar/ver o dashboard pela web não regrava o save. A
     # comparação fica antes do `GET /fase`: se o time do jogador já foi
     # eliminado, esse GET decide a fase e grava o retrato seguinte (E-018).
-    assert open(caminho, "rb").read() == bytes_antes
+    assert Path(caminho).read_bytes() == bytes_antes
 
     fase = client.get("/fase")
     assert fase.status_code == 200
