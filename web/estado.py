@@ -25,7 +25,7 @@ class EstadoJogo:
     decidido — e os classificados que avançam dela), pra não
     recalcular/resortear os confrontos a cada requisição — só é recalculada
     quando `None` (fase nova) e é limpa quando o jogador avança pra próxima
-    fase (`POST /fase/avancar`). `campeao` só é preenchido quando a
+    fase (`POST /fase/seguir`). `campeao` só é preenchido quando a
     temporada termina.
 
     `disputa_penaltis` guarda, entre requisições, o estado (formato de
@@ -113,7 +113,7 @@ def obter_jogo() -> EstadoJogo | None:
 
 
 def encerrar_jogo() -> None:
-    """Encerra o jogo em andamento (ex.: "Salvar e sair"): depois disso,
+    """Encerra o jogo em andamento: depois disso,
     `obter_jogo()` devolve `None`. Não grava nada em `saves/`."""
     global _jogo_atual
     _jogo_atual = None

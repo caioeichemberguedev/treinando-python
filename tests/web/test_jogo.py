@@ -155,8 +155,8 @@ def test_fase_sem_jogo_em_andamento_retorna_404():
     assert resposta.status_code == 404
 
 
-def test_avancar_fase_sem_jogo_em_andamento_retorna_404():
-    resposta = client.post("/fase/avancar")
+def test_seguir_fase_sem_jogo_em_andamento_retorna_404():
+    resposta = client.post("/fase/seguir")
 
     assert resposta.status_code == 404
 
@@ -371,14 +371,14 @@ def test_botao_da_tela_de_penaltis_conforme_a_vez():
     assert "Defender" in vez_do_goleiro.text
 
 
-def test_avancar_fase_com_confronto_pendente_retorna_400():
-    """Não dá pra avançar de fase com o confronto do jogador ainda em
+def test_seguir_fase_com_confronto_pendente_retorna_400():
+    """Não dá pra seguir de fase com o confronto do jogador ainda em
     aberto — precisa passar pela disputa de pênaltis primeiro.
     """
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     client.get("/fase")  # monta a fase (confronto_pendente ainda não decidido)
 
-    resposta = client.post("/fase/avancar")
+    resposta = client.post("/fase/seguir")
 
     assert resposta.status_code == 400
 
@@ -394,7 +394,7 @@ def test_fase_mostra_o_nome_da_fase_e_os_confrontos():
 
 
 def test_fase_repetida_nao_recalcula_o_resultado():
-    """GET /fase repetido (sem passar por /fase/avancar), depois do
+    """GET /fase repetido (sem passar por /fase/seguir), depois do
     confronto do jogador decidido, tem que mostrar sempre o mesmo resultado
     já fechado, sem sortear de novo a cada request.
     """
@@ -458,9 +458,9 @@ def test_fluxo_completo_ate_o_campeao_com_dois_times():
     resposta_fase = _passar_pela_fase_atual()
     assert resposta_fase.status_code == 200
 
-    resposta_avancar = client.post("/fase/avancar", follow_redirects=False)
-    assert resposta_avancar.status_code == 303
-    assert resposta_avancar.headers["location"] == "/campeao"
+    resposta_seguir = client.post("/fase/seguir", follow_redirects=False)
+    assert resposta_seguir.status_code == 303
+    assert resposta_seguir.headers["location"] == "/campeao"
 
     resposta_campeao = client.get("/campeao")
     assert resposta_campeao.status_code == 200
@@ -482,14 +482,14 @@ def test_fluxo_completo_ate_o_campeao_com_quatro_times():
         resposta_fase = _passar_pela_fase_atual()
         assert resposta_fase.status_code == 200
 
-        resposta_avancar = client.post("/fase/avancar", follow_redirects=False)
-        assert resposta_avancar.status_code == 303
+        resposta_seguir = client.post("/fase/seguir", follow_redirects=False)
+        assert resposta_seguir.status_code == 303
         rodadas += 1
 
-        if resposta_avancar.headers["location"] == "/campeao":
+        if resposta_seguir.headers["location"] == "/campeao":
             break
 
-        assert resposta_avancar.headers["location"] == "/fase"
+        assert resposta_seguir.headers["location"] == "/carreira"
         assert rodadas < 5, "Temporada com 4 times não deveria levar mais de 2 fases pra terminar."
 
     resposta_campeao = client.get("/campeao")
@@ -504,7 +504,7 @@ def test_fluxo_completo_ate_o_campeao_com_quatro_times():
 def test_campeao_acumula_a_temporada_concluida_no_historico():
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     jogo = estado.obter_jogo()
     assert len(jogo.historico) == 1
@@ -520,7 +520,7 @@ def test_historico_da_temporada_guarda_ids_e_nao_objetos_equipe():
     client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
     while True:
         _passar_pela_fase_atual()
-        resposta = client.post("/fase/avancar", follow_redirects=False)
+        resposta = client.post("/fase/seguir", follow_redirects=False)
         if resposta.headers["location"] == "/campeao":
             break
 
@@ -549,12 +549,12 @@ def test_continuar_para_proxima_temporada_sem_campeao_definido_retorna_404():
 def test_continuar_para_proxima_temporada_reinicia_o_ciclo():
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     resposta = client.post("/campeao/continuar", follow_redirects=False)
 
     assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/fase"
+    assert resposta.headers["location"] == "/carreira"
 
     jogo = estado.obter_jogo()
     assert jogo.temporada == 2027
@@ -576,7 +576,7 @@ def test_continuar_para_proxima_temporada_preserva_a_progressao_das_equipes():
     """
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     jogo = estado.obter_jogo()
     campeao = jogo.campeao
@@ -594,11 +594,11 @@ def test_continuar_para_proxima_temporada_preserva_a_progressao_das_equipes():
 def test_completar_duas_temporadas_acumula_dois_itens_no_historico():
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
     client.post("/campeao/continuar")
 
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     jogo = estado.obter_jogo()
     assert len(jogo.historico) == 2
@@ -685,7 +685,7 @@ def test_campeao_mostra_escudo_em_destaque():
     _dar_cores_aos_times_de_teste()
     client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     resposta = client.get("/campeao")
 
@@ -772,7 +772,7 @@ def test_fase_mostra_nome_e_cores_editados_com_jogo_em_andamento():
 def test_campeao_mostra_nome_e_cores_editados_com_jogo_em_andamento():
     _iniciar_jogo_e_editar_catalogo()
     _passar_pela_fase_atual()
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
 
     resposta = client.get("/campeao")
 
@@ -797,7 +797,7 @@ def test_telas_de_jogo_com_times_de_teste_seguem_com_o_nome_do_equipes_json():
     penaltis = client.get("/fase/penaltis")
     _resolver_disputa_penaltis_ate_o_fim()
     fase = client.get("/fase")
-    client.post("/fase/avancar")
+    client.post("/fase/seguir")
     campeao = client.get("/campeao")
 
     for html in (penaltis.text, fase.text):

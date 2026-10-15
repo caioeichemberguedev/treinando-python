@@ -1,17 +1,19 @@
 """E-018-T6: ponta a ponta web <-> terminal com a mesma carreira em SQLite.
 
 Cenários (o que já estava coberto em outros arquivos não se repete aqui):
-1. Carreira criada na web, "Salvar e sair" no meio, continuada pelo terminal
-   (`menu.carregar_jogo` com `input` simulado) até o fim da temporada.
+1. Carreira criada na web, "Seguir" no meio e jogo fechado (E-019: não há
+   mais "Salvar e sair" — a fase decidida já está gravada), continuada pelo
+   terminal (`menu.carregar_jogo` com `input` simulado) até o fim da
+   temporada.
 2. Carreira criada no terminal, saída no meio, continuada pela web até o
    campeão (`test_saves_sqlite_integracao.py` só carrega e abre a fase).
 3. Web: duas temporadas completas + "reinício do servidor" (estado em
    memória zerado e `TestClient` novo) e "Continuar" em `/saves`; e o mesmo
-   reinício no meio de uma temporada, sem "Salvar e sair".
+   reinício no meio de uma temporada, sem clicar em "Seguir".
 4. Nenhum arquivo fora de `tmp_path` é tocado (o `saves/` real não muda).
 
-Já cobertos em outros arquivos: só web com "Salvar e sair" a cada fase
-(`test_salvar_e_sair_bordas.py`), terminal -> terminal
+Já cobertos em outros arquivos: "Seguir" e fechar/continuar na web
+(`test_jogo_salva.py`), terminal -> terminal
 (`test_saves_sqlite_integracao.py`), gravação a cada momento do fluxo web
 (`test_jogo_salva.py`).
 """
@@ -99,8 +101,9 @@ def _jogar_ate_o_campeao(cliente=client):
     while True:
         _decidir_fase_atual(cliente)
         fases += 1
-        resposta = cliente.post("/fase/avancar", follow_redirects=False)
+        resposta = cliente.post("/fase/seguir", follow_redirects=False)
         assert resposta.status_code == 303
+        assert resposta.headers["location"] in ("/carreira", "/campeao")
         if resposta.headers["location"] == "/campeao":
             assert cliente.get("/campeao").status_code == 200
             return fases
@@ -113,7 +116,8 @@ def _continuar_pela_tela_de_saves(cliente, nome_save):
     assert nome_save in tela.text
     resposta = cliente.post(f"/saves/{nome_save}/carregar", follow_redirects=False)
     assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/fase"
+    assert resposta.headers["location"] == "/carreira"
+    assert cliente.get("/carreira").status_code == 200
     return estado.obter_jogo()
 
 
@@ -154,9 +158,10 @@ def test_carreira_da_web_salva_no_meio_e_concluida_pelo_terminal(monkeypatch):
 
     _decidir_fase_atual()  # oitavas
     ids_quartas = _ids(jogo.fase_atual["proximos"])
-    resposta = client.post("/fase/salvar-e-sair", follow_redirects=False)
+    resposta = client.post("/fase/seguir", follow_redirects=False)
     assert resposta.status_code == 303
-    assert estado.obter_jogo() is None
+    assert resposta.headers["location"] == "/carreira"
+    estado.encerrar_jogo()  # o jogador fecha o jogo (tudo já está gravado)
 
     dados = persistencia.carregar_jogo_salvo(nome_save)
     assert dados["temporada"] == 2026
@@ -185,7 +190,8 @@ def test_carreira_da_web_concluida_pelo_terminal_volta_para_a_web(monkeypatch):
     jogo = _novo_jogo_web()
     nome_save = jogo.nome_save
     _decidir_fase_atual()
-    client.post("/fase/salvar-e-sair", follow_redirects=False)
+    client.post("/fase/seguir", follow_redirects=False)
+    estado.encerrar_jogo()
     _continuar_pelo_terminal_ate_o_fim(monkeypatch)
     historico_do_terminal = persistencia.carregar_jogo_salvo(nome_save)["historico"]
 
@@ -272,9 +278,9 @@ def test_duas_temporadas_na_web_e_reinicio_do_servidor_continua_do_save(monkeypa
     assert persistencia.listar_saves() == [nome_save]
 
 
-def test_reinicio_no_meio_da_temporada_sem_salvar_e_sair_continua_da_fase_decidida(monkeypatch):
+def test_reinicio_no_meio_da_temporada_sem_seguir_continua_da_fase_decidida(monkeypatch):
     """A fase decidida já está no disco (gravação automática): reiniciar sem
-    clicar em "Salvar e sair" retoma na fase seguinte, não na mesma."""
+    clicar em "Seguir" retoma na fase seguinte, não na mesma."""
     jogo = _novo_jogo_web()
     nome_save = jogo.nome_save
     _decidir_fase_atual()  # oitavas

@@ -70,7 +70,7 @@ def test_carregar_save_valido_redireciona_e_preenche_o_estado():
     resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
 
     assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/fase"
+    assert resposta.headers["location"] == "/carreira"
 
     jogo = estado.obter_jogo()
     assert jogo is not None
@@ -82,13 +82,16 @@ def test_carregar_save_valido_redireciona_e_preenche_o_estado():
     assert jogo.historico == []
 
 
-def test_carregar_save_leva_para_a_fase_e_o_fluxo_ja_existente_funciona():
-    """Depois de carregar, `GET /fase` funciona normalmente — mesma asserção
+def test_carregar_save_leva_ao_dashboard_e_o_fluxo_da_fase_funciona():
+    """Carregar abre o dashboard (`/carreira`, E-019); de lá, "Jogar próxima
+    fase" (`GET /fase`) funciona normalmente — mesma asserção
     usada nos testes do ID-001 (com o time do jogador presente na fase, o
     fluxo redireciona para a disputa de pênaltis).
     """
     _criar_save("1_01_01_2026")
-    client.post("/saves/1_01_01_2026/carregar")
+    carregar = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+    assert carregar.headers["location"] == "/carreira"
+    assert client.get("/carreira").status_code == 200
 
     resposta = client.get("/fase", follow_redirects=False)
 
@@ -102,6 +105,7 @@ def test_carregar_save_com_classificados_none_sorteia_a_partir_do_elenco_base():
     resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
 
     assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/carreira"
     jogo = estado.obter_jogo()
     assert jogo.classificados is not None
     assert {str(time) for time in jogo.classificados} == {"Time A", "Time B"}
@@ -280,23 +284,15 @@ def test_carregar_save_inexistente_nao_cria_arquivo():
     assert estado.obter_jogo() is None
 
 
-# --- E-018-T5: mensagem do "Salvar e sair" ---
+# --- E-019-T6: sem a mensagem do antigo "Salvar e sair" ---
 
 
-def test_tela_saves_com_salvo_mostra_progresso_salvo():
+@pytest.mark.parametrize("url", ["/saves", "/saves?salvo=1"])
+def test_tela_saves_nao_mostra_progresso_salvo(url):
     _criar_save("1_01_01_2026")
 
-    resposta = client.get("/saves?salvo=1")
-
-    assert resposta.status_code == 200
-    assert "Progresso salvo!" in resposta.text
-    assert "1_01_01_2026" in resposta.text
-
-
-def test_tela_saves_sem_salvo_nao_mostra_a_mensagem():
-    _criar_save("1_01_01_2026")
-
-    resposta = client.get("/saves")
+    resposta = client.get(url)
 
     assert resposta.status_code == 200
     assert "Progresso salvo!" not in resposta.text
+    assert "1_01_01_2026" in resposta.text

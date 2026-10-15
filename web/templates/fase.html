@@ -31,10 +31,7 @@
         </tbody>
     </table>
 
-    <form method="post" action="{{ url_for('avancar_fase') }}">
-        <button type="submit" class="botao">Avançar fase</button>
-    </form>
-    <form method="post" action="{{ url_for('salvar_e_sair') }}">
-        <button type="submit" class="botao">Salvar e sair</button>
+    <form method="post" action="{{ url_for('seguir_fase') }}">
+        <button type="submit" class="botao">Seguir</button>
     </form>
 {% endblock %}

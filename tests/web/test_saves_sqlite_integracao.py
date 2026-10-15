@@ -70,14 +70,16 @@ def test_carreira_do_terminal_salva_no_meio_e_carregada_pela_web(monkeypatch):
 
     resposta = client.post(f"/saves/{nome}/carregar", follow_redirects=False)
     assert resposta.status_code == 303
-    assert resposta.headers["location"] == "/fase"
+    assert resposta.headers["location"] == "/carreira"
     jogo = estado.obter_jogo()
     assert jogo is not None
     assert [t.id for t in jogo.classificados] == [t.id for t in dados["classificados"]]
 
-    # Listar/carregar pela web não regrava o save. A comparação fica antes do
-    # `GET /fase`: se o time do jogador já foi eliminado, esse GET decide a
-    # fase e grava o retrato seguinte (E-018).
+    assert client.get("/carreira").status_code == 200
+
+    # Listar/carregar/ver o dashboard pela web não regrava o save. A
+    # comparação fica antes do `GET /fase`: se o time do jogador já foi
+    # eliminado, esse GET decide a fase e grava o retrato seguinte (E-018).
     assert open(caminho, "rb").read() == bytes_antes
 
     fase = client.get("/fase")

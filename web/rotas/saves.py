@@ -30,22 +30,19 @@ def _dados_do_save_existente(nome_save: str) -> dict:
 
 
 @router.get("/saves")
-def tela_saves(request: Request, salvo: bool = False):
+def tela_saves(request: Request):
     """Lista as carreiras salvas, com time/campeonato/temporada de cada uma
     (mesmos detalhes exibidos por `menu.escolher_save`).
-
-    `?salvo=1` (vindo do "Salvar e sair" da fase) só mostra a mensagem
-    "Progresso salvo!" — não altera nada.
     """
     saves = [{"nome": nome, **carregar_jogo_salvo(nome)} for nome in listar_saves()]
-    return templates.TemplateResponse(request, "saves.html", {"saves": saves, "salvo": salvo})
+    return templates.TemplateResponse(request, "saves.html", {"saves": saves})
 
 
 @router.post("/saves/{nome_save}/carregar")
 def carregar_save(nome_save: str):
     """Carrega uma carreira salva para dentro do estado em memória e segue
-    para a fase atual (`/fase`), reaproveitando o fluxo já existente do
-    ID-001.
+    para o dashboard da carreira (`/carreira`, E-019), de onde "Jogar
+    próxima fase" leva à fase atual.
 
     O jogo em memória guarda o `nome_save` da URL, então as próximas
     gravações da web vão para o mesmo arquivo em `saves/`.
@@ -91,7 +88,7 @@ def carregar_save(nome_save: str):
     if sorteou:
         salvar_jogo_em_andamento(jogo, jogo.temporada, jogo.classificados)
 
-    return RedirectResponse(url="/fase", status_code=303)
+    return RedirectResponse(url="/carreira", status_code=303)
 
 
 @router.get("/saves/{nome_save}/excluir")

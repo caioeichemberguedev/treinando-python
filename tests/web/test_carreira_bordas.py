@@ -139,7 +139,7 @@ def test_carreira_inteira_pela_web_adversario_bate_e_get_nao_muda_nada(semente):
         # decidida, sem seguir: a previsão sobre `proximos` bate com a fase seguinte
         html_decidida = _get_carreira_sem_efeito(jogo)
         segue_vivo = jogo.campeao is None and jogo.time_escolhido in jogo.fase_atual["proximos"]
-        client.post("/fase/avancar", follow_redirects=False)
+        client.post("/fase/seguir", follow_redirects=False)
         if segue_vivo:
             client.get("/fase", follow_redirects=False)
             assert _par(jogo).nome in html_decidida
