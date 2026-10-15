@@ -1,7 +1,13 @@
 import copy
 import inspect
 
-from estatisticas import confrontos_do_time, resumo_da_carreira
+from estatisticas import (
+    campanha_na_temporada,
+    confrontos_do_time,
+    melhor_campanha,
+    resumo_da_carreira,
+    temporada_completa,
+)
 
 # Histórico escrito à mão: 4 times (ids 1 a 4), 2 temporadas concluídas.
 # Confronto = [id_a, id_b, id_vencedor, gols_a, gols_b] (gols de pênalti).
@@ -165,3 +171,282 @@ def test_funcoes_nao_alteram_a_lista_recebida():
     resumo_da_carreira(historico, 1)
 
     assert historico == HISTORICO
+
+
+# --- E-019-T3: campanha, melhor campanha e temporada completa ---
+
+
+def _campanha(temporada, rotulo, profundidade):
+    """Campanha mínima para `melhor_campanha` (só os campos usados)."""
+    return {"temporada": temporada, "rotulo": rotulo, "profundidade": profundidade}
+
+
+def test_campanha_do_campeao():
+    """Campeão → "Campeão", profundidade 0."""
+    assert campanha_na_temporada(HISTORICO[0], 1) == {
+        "temporada": 2026,
+        "rotulo": "Campeão",
+        "campeao": 1,
+        "profundidade": 0,
+    }
+
+
+def test_campanha_de_quem_perdeu_a_final_e_vice():
+    """Perdeu a final de temporada concluída → "Vice-campeão", 1."""
+    campanha = campanha_na_temporada(HISTORICO[0], 4)
+
+    assert campanha["rotulo"] == "Vice-campeão"
+    assert campanha["profundidade"] == 1
+    assert campanha["campeao"] == 1
+
+
+def test_campanha_de_quem_perdeu_a_semifinal_sem_sufixo_do_campeonato():
+    """Perdeu a semi de 4 times → "Eliminado na Semifinal", 2."""
+    campanha = campanha_na_temporada(HISTORICO[0], 2)
+
+    assert campanha["rotulo"] == "Eliminado na Semifinal"
+    assert campanha["profundidade"] == 2
+
+
+def test_campanha_em_andamento_com_time_vivo():
+    """Temporada sem campeão e sem derrota do time → "Em andamento"."""
+    em_andamento = {
+        "temporada": 2028,
+        "campeao": None,
+        "fases": [
+            {"nome_fase": "Semifinal - Copa X", "confrontos": [[1, 2, 1, 5, 4]]},
+        ],
+    }
+
+    campanha = campanha_na_temporada(em_andamento, 1)
+
+    assert campanha["rotulo"] == "Em andamento"
+    assert campanha["profundidade"] is None
+    assert campanha["campeao"] is None
+
+
+def test_campanha_em_andamento_sem_fases_registradas():
+    """Temporada recém sorteada (sem fases) → "Em andamento"."""
+    recem_sorteada = {"temporada": 2028, "campeao": None, "fases": []}
+
+    campanha = campanha_na_temporada(recem_sorteada, 1)
+
+    assert campanha["rotulo"] == "Em andamento"
+    assert campanha["profundidade"] is None
+
+
+def test_campanha_em_andamento_ja_eliminado():
+    """Temporada sem campeão, mas o time já perdeu → "Eliminado na <fase>"
+    com a profundidade da fase (nunca "Vice", mesmo sendo a última fase
+    registrada).
+    """
+    em_andamento = {
+        "temporada": 2028,
+        "campeao": None,
+        "fases": [
+            {
+                "nome_fase": "Quartas de Final - Copa X",
+                "confrontos": [[1, 2, 2, 3, 4], [3, 4, 3, 5, 3],
+                               [5, 6, 5, 4, 2], [7, 8, 8, 1, 3]],
+            },
+        ],
+    }
+
+    campanha = campanha_na_temporada(em_andamento, 1)
+
+    assert campanha["rotulo"] == "Eliminado na Quartas de Final"
+    assert campanha["profundidade"] == 4
+
+
+def test_campanha_concluida_sem_o_time_registrado():
+    """Concluída sem o time em nenhuma fase registrada (ID-014: só a
+    final ficou gravada) → "Não registrada".
+    """
+    so_a_final = {
+        "temporada": 2026,
+        "campeao": 3,
+        "fases": [
+            {"nome_fase": "Final - Copa X", "confrontos": [[3, 4, 3, 5, 4]]},
+        ],
+    }
+
+    campanha = campanha_na_temporada(so_a_final, 1)
+
+    assert campanha["rotulo"] == "Não registrada"
+    assert campanha["profundidade"] is None
+    assert campanha["campeao"] == 3
+
+
+def test_campanha_concluida_com_o_time_so_vencendo_fases_registradas():
+    """Venceu tudo o que foi registrado mas não é o campeão (fases
+    seguintes perdidas) → "Não registrada", nunca "Em andamento".
+    """
+    incompleta = {
+        "temporada": 2026,
+        "campeao": 3,
+        "fases": [
+            {"nome_fase": "Semifinal - Copa X",
+             "confrontos": [[1, 2, 1, 5, 4], [3, 4, 3, 5, 3]]},
+        ],
+    }
+
+    campanha = campanha_na_temporada(incompleta, 1)
+
+    assert campanha["rotulo"] == "Não registrada"
+    assert campanha["profundidade"] is None
+
+
+def test_campanha_titulo_sem_nenhum_jogo_registrado():
+    """Campeão com 0 jogos registrados (carreira retomada perto do fim,
+    ID-014) continua "Campeão", profundidade 0, e conta como melhor
+    campanha.
+    """
+    sem_fases = {"temporada": 2026, "campeao": 1, "fases": []}
+
+    campanha = campanha_na_temporada(sem_fases, 1)
+
+    assert campanha["rotulo"] == "Campeão"
+    assert campanha["profundidade"] == 0
+    assert melhor_campanha([campanha]) == {
+        "rotulo": "Campeão",
+        "temporadas": [2026],
+    }
+
+
+def test_campanha_na_unica_fase_registrada_que_e_a_final_e_vice():
+    """Só a final registrada (ID-014) e o time perdeu nela → "Vice-campeão"."""
+    so_a_final = {
+        "temporada": 2026,
+        "campeao": 3,
+        "fases": [
+            {"nome_fase": "Final - Copa X", "confrontos": [[1, 3, 3, 2, 4]]},
+        ],
+    }
+
+    campanha = campanha_na_temporada(so_a_final, 1)
+
+    assert campanha["rotulo"] == "Vice-campeão"
+    assert campanha["profundidade"] == 1
+
+
+def test_melhor_campanha_escolhe_a_menor_profundidade():
+    """A campanha que foi mais longe (menor profundidade) vence."""
+    campanhas = [
+        _campanha(2026, "Eliminado na Quartas de Final", 4),
+        _campanha(2027, "Vice-campeão", 1),
+        _campanha(2028, "Eliminado na Semifinal", 2),
+    ]
+
+    assert melhor_campanha(campanhas) == {
+        "rotulo": "Vice-campeão",
+        "temporadas": [2027],
+    }
+
+
+def test_melhor_campanha_empate_junta_temporadas_em_ordem():
+    """Empate na melhor profundidade junta as temporadas, em ordem."""
+    campanhas = [
+        _campanha(2026, "Campeão", 0),
+        _campanha(2027, "Eliminado na Semifinal", 2),
+        _campanha(2028, "Campeão", 0),
+    ]
+
+    assert melhor_campanha(campanhas) == {
+        "rotulo": "Campeão",
+        "temporadas": [2026, 2028],
+    }
+
+
+def test_melhor_campanha_ignora_em_andamento_e_nao_registrada():
+    """Campanhas com profundidade `None` não entram na escolha."""
+    campanhas = [
+        _campanha(2026, "Não registrada", None),
+        _campanha(2027, "Eliminado na Semifinal", 2),
+        _campanha(2028, "Em andamento", None),
+    ]
+
+    assert melhor_campanha(campanhas) == {
+        "rotulo": "Eliminado na Semifinal",
+        "temporadas": [2027],
+    }
+
+
+def test_melhor_campanha_so_nones_ou_vazia_da_none():
+    """Sem nenhuma campanha julgável → `None`."""
+    assert melhor_campanha([]) is None
+    assert melhor_campanha([
+        _campanha(2026, "Não registrada", None),
+        _campanha(2027, "Em andamento", None),
+    ]) is None
+
+
+def test_melhor_campanha_a_partir_do_historico():
+    """Integração: campanhas do histórico de exemplo → melhor é o título
+    de 2026 para o time 1 e o vice de 2026 para o time 4.
+    """
+    campanhas_1 = [campanha_na_temporada(t, 1) for t in HISTORICO]
+    campanhas_4 = [campanha_na_temporada(t, 4) for t in HISTORICO]
+
+    assert [c["rotulo"] for c in campanhas_1] == ["Campeão", "Vice-campeão"]
+    assert melhor_campanha(campanhas_1) == {
+        "rotulo": "Campeão",
+        "temporadas": [2026],
+    }
+    assert melhor_campanha(campanhas_4) == {
+        "rotulo": "Vice-campeão",
+        "temporadas": [2026],
+    }
+
+
+def _temporada_com_primeira_fase(num_confrontos):
+    """Temporada cuja 1ª fase registrada tem `num_confrontos` confrontos."""
+    confrontos = [[i, i + 100, i, 5, 4] for i in range(num_confrontos)]
+    return {
+        "temporada": 2026,
+        "campeao": None,
+        "fases": [{"nome_fase": "Fase - Copa X", "confrontos": confrontos}],
+    }
+
+
+def test_temporada_completa_16_times_com_8_confrontos():
+    """16 times e 8 confrontos na 1ª fase → completa."""
+    assert temporada_completa(_temporada_com_primeira_fase(8), 16) is True
+
+
+def test_temporada_incompleta_16_times_comecando_nas_quartas():
+    """16 times e só 4 confrontos (começou nas quartas, ID-014) → False."""
+    assert temporada_completa(_temporada_com_primeira_fase(4), 16) is False
+
+
+def test_temporada_completa_sem_fases():
+    """Sem fases não há o que julgar → True."""
+    sem_fases = {"temporada": 2026, "campeao": None, "fases": []}
+
+    assert temporada_completa(sem_fases, 16) is True
+
+
+def test_temporada_completa_total_impar_com_bye():
+    """5 times: 2 confrontos na 1ª fase (um avança direto) → True."""
+    assert temporada_completa(_temporada_com_primeira_fase(2), 5) is True
+
+
+def test_temporada_completa_com_ate_um_time():
+    """Total de times 0 ou 1 (estado de teste) → True."""
+    assert temporada_completa(_temporada_com_primeira_fase(4), 0) is True
+    assert temporada_completa(_temporada_com_primeira_fase(4), 1) is True
+
+
+def test_funcoes_de_campanha_nao_alteram_o_que_recebem():
+    """`campanha_na_temporada`, `melhor_campanha` e `temporada_completa`
+    não mexem no que recebem.
+    """
+    historico = copy.deepcopy(HISTORICO)
+
+    campanhas = [campanha_na_temporada(t, 1) for t in historico]
+    copia_campanhas = copy.deepcopy(campanhas)
+    melhor_campanha(campanhas)
+    for temporada in historico:
+        temporada_completa(temporada, 4)
+
+    assert historico == HISTORICO
+    assert campanhas == copia_campanhas

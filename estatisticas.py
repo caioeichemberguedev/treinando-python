@@ -15,6 +15,11 @@ from collections.abc import Iterator
 
 SEPARADOR_CAMPEONATO = " - "
 CASAS_DECIMAIS_APROVEITAMENTO = 1
+ROTULO_CAMPEAO = "Campeão"
+ROTULO_VICE = "Vice-campeão"
+ROTULO_EM_ANDAMENTO = "Em andamento"
+ROTULO_NAO_REGISTRADA = "Não registrada"
+PROFUNDIDADE_CAMPEAO = 0
 
 
 def nome_fase_curto(nome_fase: str) -> str:
@@ -87,3 +92,80 @@ def resumo_da_carreira(temporadas: list[dict], id_time: int) -> dict:
         "gols_sofridos": gols_sofridos,
         "titulos": titulos,
     }
+
+
+def _campanha(
+    temporada: dict, rotulo: str, profundidade: int | None
+) -> dict:
+    """Monta o dict de retorno de `campanha_na_temporada`."""
+    return {
+        "temporada": temporada["temporada"],
+        "rotulo": rotulo,
+        "campeao": temporada.get("campeao"),
+        "profundidade": profundidade,
+    }
+
+
+def campanha_na_temporada(temporada: dict, id_time: int) -> dict:
+    """Diz até onde `id_time` chegou numa temporada.
+
+    Devolve `{"temporada", "rotulo", "campeao", "profundidade"}`.
+    `profundidade` é o número de confrontos da fase em que o time caiu
+    (menor = foi mais longe; 0 = campeão) ou `None` quando não dá para
+    julgar: temporada em andamento com o time ainda vivo ("Em andamento")
+    ou concluída sem nenhuma derrota registrada do time ("Não registrada",
+    fases perdidas ao retomar no meio — ID-014). O campeão vale mesmo sem
+    nenhum jogo registrado.
+    """
+    if temporada.get("campeao") == id_time and id_time is not None:
+        return _campanha(temporada, ROTULO_CAMPEAO, PROFUNDIDADE_CAMPEAO)
+
+    fases = temporada.get("fases", [])
+    concluida = temporada.get("campeao") is not None
+    for indice, fase in enumerate(fases):
+        for id_a, id_b, id_vencedor, _, _ in fase["confrontos"]:
+            if id_time in (id_a, id_b) and id_vencedor != id_time:
+                profundidade = len(fase["confrontos"])
+                if concluida and indice == len(fases) - 1:
+                    return _campanha(temporada, ROTULO_VICE, profundidade)
+                rotulo = f"Eliminado na {nome_fase_curto(fase['nome_fase'])}"
+                return _campanha(temporada, rotulo, profundidade)
+
+    rotulo = ROTULO_NAO_REGISTRADA if concluida else ROTULO_EM_ANDAMENTO
+    return _campanha(temporada, rotulo, None)
+
+
+def melhor_campanha(campanhas: list[dict]) -> dict | None:
+    """Escolhe a campanha de menor `profundidade` (a que foi mais longe).
+
+    Devolve `{"rotulo", "temporadas"}`; empates juntam as temporadas na
+    ordem recebida (o rótulo é o da primeira). Campanhas com `profundidade`
+    `None` ("Em andamento", "Não registrada") são ignoradas; sem nenhuma
+    julgável, devolve `None`.
+    """
+    julgaveis = [c for c in campanhas if c["profundidade"] is not None]
+    if not julgaveis:
+        return None
+    melhor = min(julgaveis, key=lambda campanha: campanha["profundidade"])
+    return {
+        "rotulo": melhor["rotulo"],
+        "temporadas": [
+            c["temporada"]
+            for c in julgaveis
+            if c["profundidade"] == melhor["profundidade"]
+        ],
+    }
+
+
+def temporada_completa(temporada: dict, total_times: int) -> bool:
+    """Diz se a primeira fase registrada é mesmo a primeira do torneio.
+
+    Com `total_times` times, a primeira fase tem `total_times // 2`
+    confrontos (o ímpar avança direto). Menos que isso = fases perdidas ao
+    retomar a carreira no meio (ID-014). Sem fases ou com até 1 time não há
+    o que julgar → `True`.
+    """
+    fases = temporada.get("fases", [])
+    if total_times <= 1 or not fases:
+        return True
+    return len(fases[0]["confrontos"]) == total_times // 2
