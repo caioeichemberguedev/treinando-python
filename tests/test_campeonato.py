@@ -1,6 +1,8 @@
 import json
+import random
 
 from campeonato import (
+    adversario_na_proxima_fase,
     montar_classificacao,
     montar_confrontos_fase,
     registro_da_fase,
@@ -177,3 +179,152 @@ def test_montar_classificacao_funciona_com_registro_em_ids():
         ("Vice-campeão", [901]),
         ("Semifinal", [902, 903]),
     ]
+
+
+def _times(*nomes):
+    """Cria uma `Equipe` por nome, com ids 1, 2, 3... na ordem recebida."""
+    return [Equipe(nome, id=indice) for indice, nome in enumerate(nomes, start=1)]
+
+
+def test_adversario_na_proxima_fase_quatro_times_pares_consecutivos():
+    """Com 4 times, C enfrenta D e D enfrenta C, na Semifinal."""
+    time_a, time_b, time_c, time_d = _times("A", "B", "C", "D")
+    classificados = [time_a, time_b, time_c, time_d]
+
+    assert adversario_na_proxima_fase(classificados, time_c) == ("Semifinal", time_d)
+    assert adversario_na_proxima_fase(classificados, time_d) == ("Semifinal", time_c)
+
+
+def test_adversario_na_proxima_fase_acrescenta_sufixo_do_campeonato():
+    """O nome da fase ganha o sufixo " - <campeonato>", como no histórico."""
+    time_a, time_b, time_c, time_d = _times("A", "B", "C", "D")
+
+    resultado = adversario_na_proxima_fase(
+        [time_a, time_b, time_c, time_d], time_c, campeonato="Copa X"
+    )
+
+    assert resultado == ("Semifinal - Copa X", time_d)
+
+
+def test_adversario_na_proxima_fase_tres_times_ultimo_ganha_bye():
+    """Com 3 times, o último avança direto (adversário `None`) e os outros
+    dois se enfrentam na Final.
+    """
+    time_a, time_b, time_c = _times("A", "B", "C")
+    classificados = [time_a, time_b, time_c]
+
+    assert adversario_na_proxima_fase(classificados, time_c) == ("Final", None)
+    assert adversario_na_proxima_fase(classificados, time_a) == ("Final", time_b)
+
+
+def test_adversario_na_proxima_fase_time_fora_da_lista_devolve_none():
+    """Time que não está nos classificados (ex.: eliminado) não tem próximo
+    adversário.
+    """
+    time_a, time_b, time_c, time_d = _times("A", "B", "C", "D")
+
+    assert adversario_na_proxima_fase([time_a, time_b, time_c], time_d) is None
+
+
+def test_adversario_na_proxima_fase_lista_com_um_time_ou_vazia_devolve_none():
+    """Sem pelo menos 2 times não há fase a jogar."""
+    (time_a,) = _times("A")
+
+    assert adversario_na_proxima_fase([time_a], time_a) is None
+    assert adversario_na_proxima_fase([], time_a) is None
+
+
+def test_adversario_na_proxima_fase_nao_altera_lista_recebida():
+    """A função trabalha sobre uma cópia — nem o bye mexe na lista original."""
+    classificados = _times("A", "B", "C")
+    original = list(classificados)
+
+    adversario_na_proxima_fase(classificados, classificados[0])
+    adversario_na_proxima_fase(classificados, classificados[-1])
+
+    assert classificados == original
+    assert all(antes is depois for antes, depois in zip(original, classificados))
+
+
+def test_adversario_na_proxima_fase_compara_equipes_pelo_id():
+    """O time do jogador pode ser outro objeto `Equipe` com o mesmo id (ex.:
+    depois de carregar um save) — continua sendo encontrado.
+    """
+    time_a, time_b, time_c, time_d = _times("A", "B", "C", "D")
+    copia_de_c = Equipe("C renomeado", id=time_c.id)
+
+    resultado = adversario_na_proxima_fase([time_a, time_b, time_c, time_d], copia_de_c)
+
+    assert resultado == ("Semifinal", time_d)
+
+
+def test_adversario_na_proxima_fase_bate_com_confronto_pendente_real():
+    """Para listas de 2 a 9 times e o jogador em cada posição, o adversário
+    previsto é o outro time do `confronto_pendente` de
+    `montar_confrontos_fase`, com o mesmo nome de fase; e adversário `None`
+    corresponde a não haver pendente (jogador no bye).
+    """
+    random.seed(19)
+
+    for total in range(2, 10):
+        for posicao in range(total):
+            classificados = sortear_classificados(
+                _times(*(f"T{numero}" for numero in range(1, total + 1)))
+            )
+            jogador = classificados[posicao]
+
+            previsto = adversario_na_proxima_fase(classificados, jogador, campeonato="Copa X")
+            nome_fase, _, confronto_pendente, _ = montar_confrontos_fase(
+                classificados, time_escolhido=jogador, campeonato="Copa X"
+            )
+
+            nome_previsto, adversario = previsto
+            assert nome_previsto == nome_fase
+            if confronto_pendente is None:
+                assert adversario is None
+                assert jogador == classificados[-1]
+            else:
+                time_a, time_b = confronto_pendente
+                assert jogador in (time_a, time_b)
+                esperado = time_b if time_a == jogador else time_a
+                assert adversario == esperado
+
+
+def test_adversario_na_proxima_fase_bate_com_fluxo_web_jogador_no_fim_de_proximos():
+    """Reproduz a ordem do fluxo web: os confrontos resolvidos entram em
+    `proximos` na ordem do chaveamento, depois o bye, e só por último o
+    vencedor do confronto do jogador (`_concluir_disputa_penaltis`). Prevendo
+    sobre essa lista `proximos`, o adversário/fase previstos são os que a
+    fase seguinte (`montar_confrontos_fase(proximos, ...)`) de fato monta,
+    fase após fase, até o fim da temporada ou a eliminação do jogador.
+    """
+    for semente in range(40):
+        random.seed(semente)
+        for total in range(2, 17):
+            classificados = sortear_classificados(
+                _times(*(f"T{numero}" for numero in range(1, total + 1)))
+            )
+            jogador = random.choice(classificados)
+
+            while len(classificados) >= 2:
+                previsto = adversario_na_proxima_fase(classificados, jogador, campeonato="Copa X")
+                nome_fase, _, pendente, proximos = montar_confrontos_fase(
+                    classificados, time_escolhido=jogador, campeonato="Copa X"
+                )
+
+                if jogador not in classificados:
+                    assert previsto is None
+                    assert pendente is None
+                else:
+                    assert previsto is not None
+                    assert previsto[0] == nome_fase
+                    if pendente is None:
+                        assert previsto[1] is None
+                    else:
+                        time_a, time_b = pendente
+                        esperado = time_b if time_a == jogador else time_a
+                        assert previsto[1] == esperado
+                        # Web: vencedor do confronto do jogador vai para o FIM.
+                        proximos = proximos + [random.choice(pendente)]
+
+                classificados = proximos

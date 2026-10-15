@@ -166,6 +166,42 @@ def montar_confrontos_fase(classificados, time_escolhido=None, campeonato=""):
     return nome_fase, confrontos_resolvidos, confronto_pendente, proximos_parciais
 
 
+def adversario_na_proxima_fase(classificados, time_escolhido, campeonato=""):
+    """Diz contra quem `time_escolhido` vai jogar na fase montada a partir
+    de `classificados`, sem decidir nenhum confronto.
+
+    Usa exatamente a mesma regra de `montar_confrontos_fase` (bye para o
+    último quando o total é ímpar, via `_separar_bye`; depois pares
+    consecutivos `[0, 1], [2, 3]...`) — nunca supõe a posição do time no
+    chaveamento. A comparação é por `==` (igualdade de `Equipe` pelo id).
+    Não altera a lista recebida.
+
+    Retorna:
+    - `None` se há menos de 2 times ou se `time_escolhido` não está em
+      `classificados` (ex.: foi eliminado);
+    - `(nome_fase, None)` se o time avança direto (bye);
+    - `(nome_fase, adversario)` nos demais casos.
+    """
+    if len(classificados) < 2 or time_escolhido not in classificados:
+        return None
+
+    classificados = list(classificados)
+    avanca_direto = _separar_bye(classificados)
+
+    nome_fase = nome_da_fase(len(classificados) // 2)
+    if campeonato:
+        nome_fase = f"{nome_fase} - {campeonato}"
+
+    if avanca_direto == time_escolhido:
+        return nome_fase, None
+
+    indice = classificados.index(time_escolhido)
+    # Pares consecutivos: o parceiro do índice par é o seguinte, e o do
+    # ímpar é o anterior.
+    indice_adversario = indice + 1 if indice % 2 == 0 else indice - 1
+    return nome_fase, classificados[indice_adversario]
+
+
 def registro_da_fase(nome_fase, confrontos):
     """Monta o registro de uma fase para o histórico, identificando cada
     time pelo `id` (e não pelo objeto `Equipe` nem pelo nome).
