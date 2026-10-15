@@ -35,6 +35,12 @@ class EstadoJogo:
     persistido aqui porque cada cobrança é uma requisição HTTP separada.
     `None` quando não há disputa em andamento.
 
+    `fases_da_temporada` guarda as fases já fechadas da temporada atual no
+    MESMO formato de ids das fases do histórico (cada uma vem de
+    `campeonato.registro_da_fase`: `{"nome_fase", "confrontos": [[id_a,
+    id_b, id_vencedor, gols_a, gols_b], ...]}`) — nada de objetos `Equipe`,
+    então pode ir direto para o histórico/save.
+
     `historico` guarda as temporadas já concluídas desta carreira, no mesmo
     formato usado por `persistencia`/`menu.py`: uma lista de dicts
     `{"temporada", "campeao", "fases"}` que identifica os times pelo `id`

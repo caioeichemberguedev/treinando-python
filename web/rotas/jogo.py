@@ -111,9 +111,10 @@ def _retrato_apos_fase(jogo: EstadoJogo) -> tuple[int, list[Equipe] | None]:
 def _fechar_fase(jogo: EstadoJogo) -> None:
     """Fecha a fase atual no instante em que fica decidida (uma vez por
     fase), como o terminal faz antes do prompt "ENTER / sair": acrescenta a
-    fase em `fases_da_temporada`; se sobrou 1 classificado, coroa o campeão e
-    soma a temporada ao `historico` (formato de ids do save, via
-    `registro_da_fase` e `campeao.id`); e grava o retrato do "depois"
+    fase em `fases_da_temporada` já no formato de ids do histórico (via
+    `registro_da_fase`); se sobrou 1 classificado, coroa o campeão e soma a
+    temporada ao `historico` (cópia de `fases_da_temporada` + `campeao.id`,
+    sem converter de novo); e grava o retrato do "depois"
     (`_retrato_apos_fase`).
 
     Não mexe em `jogo.classificados` nem em `jogo.fase_atual`: a tela da fase
@@ -126,7 +127,7 @@ def _fechar_fase(jogo: EstadoJogo) -> None:
         return
 
     jogo.fases_da_temporada.append(
-        {"nome_fase": jogo.fase_atual["nome_fase"], "confrontos": jogo.fase_atual["confrontos"]}
+        registro_da_fase(jogo.fase_atual["nome_fase"], jogo.fase_atual["confrontos"])
     )
     proximos = jogo.fase_atual["proximos"]
 
@@ -134,8 +135,9 @@ def _fechar_fase(jogo: EstadoJogo) -> None:
         campeao = proximos[0]
         campeao.sagrar_campea()
         jogo.campeao = campeao
-        fases = [registro_da_fase(fase["nome_fase"], fase["confrontos"]) for fase in jogo.fases_da_temporada]
-        jogo.historico.append({"temporada": jogo.temporada, "campeao": campeao.id, "fases": fases})
+        jogo.historico.append(
+            {"temporada": jogo.temporada, "campeao": campeao.id, "fases": list(jogo.fases_da_temporada)}
+        )
 
     temporada, classificados = _retrato_apos_fase(jogo)
     salvar_jogo_em_andamento(jogo, temporada, classificados)

@@ -421,9 +421,9 @@ def test_historico_da_carreira_tem_uma_linha_por_temporada_com_link():
 
 def test_temporada_em_andamento_entra_nas_estatisticas():
     jogo = _jogo_com_historico()
-    a, b, c, d = jogo.classificados
+    a, b, c, d = (time.id for time in jogo.classificados)
     jogo.fases_da_temporada = [
-        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 4, 3), (c, d, d, 1, 0)]},
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [[a, b, a, 4, 3], [c, d, d, 1, 0]]},
     ]
 
     html = client.get("/carreira").text
@@ -439,7 +439,7 @@ def test_eliminado_na_temporada_em_andamento_usa_a_campanha():
     jogo = _jogo_com_historico()
     a, b, c, d = jogo.classificados
     jogo.fases_da_temporada = [
-        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, b, 1, 3), (c, d, d, 1, 0)]},
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [[a.id, b.id, b.id, 1, 3], [c.id, d.id, d.id, 1, 0]]},
     ]
     jogo.classificados = [b, d]
 
@@ -468,8 +468,8 @@ def test_campeao_coroado_nao_conta_a_temporada_em_dobro():
     # Antes de `/campeao/continuar`: a temporada já está no histórico E ainda
     # em `fases_da_temporada`.
     jogo.fases_da_temporada = [
-        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 3, 0), (c, d, c, 2, 1)]},
-        {"nome_fase": "Final - Copa Teste", "confrontos": [(a, c, a, 4, 2)]},
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [[a.id, b.id, a.id, 3, 0], [c.id, d.id, c.id, 2, 1]]},
+        {"nome_fase": "Final - Copa Teste", "confrontos": [[a.id, c.id, a.id, 4, 2]]},
     ]
     jogo.campeao = a
     esperado = resumo_da_carreira(historico, ID_JOGADOR)
@@ -532,14 +532,14 @@ def test_campeao_do_historico_usa_o_nome_editado_pelo_adm():
 
 def test_get_carreira_com_estatisticas_nao_altera_historico_nem_fases():
     jogo = _jogo_com_historico()
-    a, b, c, d = jogo.classificados
+    a, b, c, d = (time.id for time in jogo.classificados)
     jogo.fases_da_temporada = [
-        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 4, 3), (c, d, d, 1, 0)]},
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [[a, b, a, 4, 3], [c, d, d, 1, 0]]},
     ]
     historico_antes = json.dumps(jogo.historico)
-    fases_antes = [dict(fase, confrontos=list(fase["confrontos"])) for fase in jogo.fases_da_temporada]
+    fases_antes = json.dumps(jogo.fases_da_temporada)
 
     client.get("/carreira")
 
     assert json.dumps(jogo.historico) == historico_antes
-    assert jogo.fases_da_temporada == fases_antes
+    assert json.dumps(jogo.fases_da_temporada) == fases_antes

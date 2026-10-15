@@ -515,7 +515,8 @@ def test_campeao_acumula_a_temporada_concluida_no_historico():
 def test_historico_da_temporada_guarda_ids_e_nao_objetos_equipe():
     """Com 4 times (2 fases), o histórico gravado ao chegar em /campeao usa
     o formato de ids do save: campeão `int` e confrontos `[int, int, int,
-    int, int]` — enquanto `fases_da_temporada` segue com objetos `Equipe`.
+    int, int]`. `fases_da_temporada` já guarda esse mesmo formato (E-014),
+    então o histórico recebe uma cópia idêntica, sem converter de novo.
     """
     client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
     while True:
@@ -530,14 +531,70 @@ def test_historico_da_temporada_guarda_ids_e_nao_objetos_equipe():
     assert registro["campeao"] == jogo.campeao.id
     assert len(registro["fases"]) == 2
     ids_validos = {905, 906, 907, 908}
-    for fase, fase_original in zip(registro["fases"], jogo.fases_da_temporada):
-        assert fase["nome_fase"] == fase_original["nome_fase"]
+    assert registro["fases"] == jogo.fases_da_temporada
+    assert registro["fases"] is not jogo.fases_da_temporada
+    for fase in registro["fases"]:
         for confronto in fase["confrontos"]:
             assert isinstance(confronto, list)
             assert len(confronto) == 5
             assert all(type(valor) is int for valor in confronto)
             assert set(confronto[:3]) <= ids_validos
     assert json.loads(json.dumps(jogo.historico)) == jogo.historico
+    assert json.loads(json.dumps(jogo.fases_da_temporada)) == jogo.fases_da_temporada
+
+
+def test_fase_decidida_nos_penaltis_entra_em_ids_com_o_placar_da_disputa():
+    """E-014: o confronto do jogador, decidido nos pênaltis, entra em
+    `fases_da_temporada` já em ids, por último, com o placar da disputa."""
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
+    client.get("/fase", follow_redirects=False)
+    jogo = estado.obter_jogo()
+    pendente = jogo.fase_atual["confronto_pendente"]
+    assert pendente is not None
+    ids_pendente = {pendente[0].id, pendente[1].id}
+
+    _resolver_disputa_penaltis_ate_o_fim()
+
+    assert len(jogo.fases_da_temporada) == 1
+    fase = jogo.fases_da_temporada[0]
+    assert fase["nome_fase"] == jogo.fase_atual["nome_fase"]
+    assert len(fase["confrontos"]) == 2
+    for confronto in fase["confrontos"]:
+        assert type(confronto) is list
+        assert all(type(valor) is int for valor in confronto)
+        assert confronto[2] in confronto[:2]
+        assert confronto[3] != confronto[4]
+    ultimo = fase["confrontos"][-1]
+    assert set(ultimo[:2]) == ids_pendente
+    vencedor = ultimo[0] if ultimo[3] > ultimo[4] else ultimo[1]
+    assert ultimo[2] == vencedor
+    assert vencedor in {time.id for time in jogo.fase_atual["proximos"]}
+
+
+def test_historico_coroado_nao_muda_ao_comecar_a_proxima_temporada():
+    """A cópia das fases que vai para o histórico não pode depender da lista
+    `fases_da_temporada`: limpar/encher a lista na temporada seguinte não
+    altera o registro da temporada já coroada."""
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
+    while True:
+        _passar_pela_fase_atual()
+        resposta = client.post("/fase/seguir", follow_redirects=False)
+        if resposta.headers["location"] == "/campeao":
+            break
+    jogo = estado.obter_jogo()
+    registro_antes = json.dumps(jogo.historico)
+
+    jogo.fases_da_temporada.append({"nome_fase": "Intrusa", "confrontos": []})
+    assert json.dumps(jogo.historico) == registro_antes
+    jogo.fases_da_temporada.pop()
+
+    client.post("/campeao/continuar")
+    assert jogo.fases_da_temporada == []
+    _passar_pela_fase_atual()
+
+    assert json.dumps(jogo.historico[:1]) == registro_antes
+    assert len(jogo.historico[0]["fases"]) == 2
+    assert len(jogo.fases_da_temporada) == 1
 
 
 def test_continuar_para_proxima_temporada_sem_campeao_definido_retorna_404():

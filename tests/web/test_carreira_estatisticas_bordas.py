@@ -162,13 +162,7 @@ def test_varias_temporadas_links_apontam_para_a_temporada_certa():
         {
             "temporada": 2029,
             "campeao": None,
-            "fases": [
-                {
-                    "nome_fase": f["nome_fase"],
-                    "confrontos": [[a.id, b.id, v.id, ga, gb] for a, b, v, ga, gb in f["confrontos"]],
-                }
-                for f in jogo.fases_da_temporada
-            ],
+            "fases": list(jogo.fases_da_temporada),
         }
     ]
     _assert_estatisticas(html, temporadas, jogo.time_escolhido.id)

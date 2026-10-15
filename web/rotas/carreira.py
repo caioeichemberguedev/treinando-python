@@ -10,7 +10,7 @@ quando cada fase fica decidida, desde o E-018).
 
 from fastapi import APIRouter, HTTPException, Request
 
-from campeonato import adversario_na_proxima_fase, registro_da_fase
+from campeonato import adversario_na_proxima_fase
 from estatisticas import (
     campanha_na_temporada,
     melhor_campanha,
@@ -26,16 +26,13 @@ router = APIRouter(tags=["carreira"])
 
 def _temporada_em_andamento(jogo: EstadoJogo) -> dict:
     """Temporada atual no formato de ids do histórico (`"campeao": None`),
-    montada das fases já jogadas (`jogo.fases_da_temporada`) via
-    `registro_da_fase`. Ao retomar no meio da temporada as fases anteriores
-    não existem mais (ID-014) — a lista começa vazia."""
+    com uma cópia das fases já jogadas (`jogo.fases_da_temporada`, que já
+    estão no formato de ids). Ao retomar no meio da temporada as fases
+    anteriores não existem mais (ID-014) — a lista começa vazia."""
     return {
         "temporada": jogo.temporada,
         "campeao": None,
-        "fases": [
-            registro_da_fase(fase["nome_fase"], fase["confrontos"])
-            for fase in jogo.fases_da_temporada
-        ],
+        "fases": list(jogo.fases_da_temporada),
     }
 
 
