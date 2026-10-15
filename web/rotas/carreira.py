@@ -2,39 +2,102 @@
 as fases.
 
 `GET /carreira` só lê o estado em memória (`web/estado.py`) e mostra o
-próximo jogo, a ficha do time e os botões para continuar ou voltar ao
+próximo jogo, a ficha do time, as estatísticas e o histórico da carreira
+(calculados por `estatisticas.py`) e os botões para continuar ou voltar ao
 menu — nunca muda o estado nem grava em `saves/` (a carreira já é gravada
 quando cada fase fica decidida, desde o E-018).
 """
 
 from fastapi import APIRouter, HTTPException, Request
 
-from campeonato import adversario_na_proxima_fase
+from campeonato import adversario_na_proxima_fase, registro_da_fase
+from estatisticas import (
+    campanha_na_temporada,
+    melhor_campanha,
+    nome_fase_curto,
+    resumo_da_carreira,
+    temporada_completa,
+)
 from web.estado import EstadoJogo, obter_jogo
 from web.templates_config import templates
 
 router = APIRouter(tags=["carreira"])
 
 
-def _nome_curto_da_fase(nome_fase: str) -> str:
-    """Tira o sufixo `" - <campeonato>"` do nome da fase (mesma regra de
-    `campeonato.montar_classificacao`)."""
-    return nome_fase.split(" - ")[0]
+def _temporada_em_andamento(jogo: EstadoJogo) -> dict:
+    """Temporada atual no formato de ids do histórico (`"campeao": None`),
+    montada das fases já jogadas (`jogo.fases_da_temporada`) via
+    `registro_da_fase`. Ao retomar no meio da temporada as fases anteriores
+    não existem mais (ID-014) — a lista começa vazia."""
+    return {
+        "temporada": jogo.temporada,
+        "campeao": None,
+        "fases": [
+            registro_da_fase(fase["nome_fase"], fase["confrontos"])
+            for fase in jogo.fases_da_temporada
+        ],
+    }
 
 
-def _fase_da_eliminacao(jogo: EstadoJogo) -> str | None:
-    """Nome curto da fase em que o time do jogador perdeu, procurando só nas
-    fases já jogadas desta temporada (`jogo.fases_da_temporada`).
+def _temporadas_da_carreira(jogo: EstadoJogo) -> list[dict]:
+    """Todas as temporadas da carreira, no formato de ids do histórico: as
+    concluídas (`jogo.historico`) e, se o campeão ainda não foi coroado, a
+    temporada em andamento.
 
-    `None` quando a derrota não está registrada (carreira carregada no meio
-    da temporada — as fases anteriores não ficam guardadas, ID-014).
+    Com o campeão coroado (antes de `/campeao/continuar`) a temporada atual
+    já está no `historico` e ainda está em `fases_da_temporada` — por isso
+    ela não entra de novo (os jogos não podem contar em dobro).
     """
-    for fase in jogo.fases_da_temporada:
-        for time_a, time_b, vencedor, _gols_a, _gols_b in fase["confrontos"]:
-            jogou = jogo.time_escolhido in (time_a, time_b)
-            if jogou and vencedor != jogo.time_escolhido:
-                return _nome_curto_da_fase(fase["nome_fase"])
-    return None
+    temporadas = list(jogo.historico)
+    if jogo.campeao is None:
+        temporadas.append(_temporada_em_andamento(jogo))
+    return temporadas
+
+
+def _rotulo_da_eliminacao(jogo: EstadoJogo) -> str | None:
+    """Rótulo "Eliminado na <fase>" da temporada em andamento, vindo de
+    `campanha_na_temporada`. `None` quando a derrota não está registrada
+    (carreira carregada no meio da temporada, ID-014)."""
+    campanha = campanha_na_temporada(_temporada_em_andamento(jogo), jogo.time_escolhido.id)
+    if campanha["profundidade"] is None:
+        return None
+    return campanha["rotulo"]
+
+
+def _linhas_do_historico(jogo: EstadoJogo, temporadas: list[dict]) -> list[dict]:
+    """Uma linha por temporada para a tabela "Histórico da carreira":
+    `campanha` (de `campanha_na_temporada`), `campeao` (id ou `None` na
+    temporada em andamento) e `indice` (1-based, para o link de
+    `tela_historico_jogos`; `None` na temporada em andamento, que ainda não
+    está no `historico`)."""
+    total_concluidas = len(jogo.historico)
+    return [
+        {
+            "campanha": campanha_na_temporada(temporada, jogo.time_escolhido.id),
+            "campeao": temporada.get("campeao"),
+            "indice": posicao + 1 if posicao < total_concluidas else None,
+        }
+        for posicao, temporada in enumerate(temporadas)
+    ]
+
+
+def _estatisticas(jogo: EstadoJogo) -> dict:
+    """Dados das seções "Estatísticas da carreira" e "Histórico da carreira"
+    do dashboard: `resumo` (`resumo_da_carreira`), `melhor` (`melhor_campanha`,
+    ou `None`), `linhas` da tabela e `incompleto` (alguma temporada sem as
+    primeiras fases, ID-014; nunca com `times_do_campeonato` vazio)."""
+    temporadas = _temporadas_da_carreira(jogo)
+    linhas = _linhas_do_historico(jogo, temporadas)
+    total_times = len(jogo.times_do_campeonato)
+    incompleto = total_times > 0 and not all(
+        temporada_completa(temporada, total_times) for temporada in temporadas
+    )
+    return {
+        "resumo": resumo_da_carreira(temporadas, jogo.time_escolhido.id),
+        "melhor": melhor_campanha([linha["campanha"] for linha in linhas]),
+        "linhas": linhas,
+        "incompleto": incompleto,
+    }
 
 
 def _proximo_jogo(jogo: EstadoJogo) -> dict:
@@ -65,17 +128,17 @@ def _proximo_jogo(jogo: EstadoJogo) -> dict:
         adversario = time_b if time_a == jogo.time_escolhido else time_a
         return {
             "situacao": "jogo",
-            "nome_fase": _nome_curto_da_fase(fase_atual["nome_fase"]),
+            "nome_fase": nome_fase_curto(fase_atual["nome_fase"]),
             "adversario": adversario,
         }
 
     lista = fase_atual["proximos"] if fase_atual is not None else jogo.classificados
     previsao = adversario_na_proxima_fase(lista, jogo.time_escolhido, jogo.campeonato)
     if previsao is None:
-        return {"situacao": "eliminado", "fase_eliminacao": _fase_da_eliminacao(jogo)}
+        return {"situacao": "eliminado", "rotulo_eliminacao": _rotulo_da_eliminacao(jogo)}
 
     nome_fase, adversario = previsao
-    nome_fase = _nome_curto_da_fase(nome_fase)
+    nome_fase = nome_fase_curto(nome_fase)
     if adversario is None:
         return {"situacao": "bye", "nome_fase": nome_fase}
     return {"situacao": "jogo", "nome_fase": nome_fase, "adversario": adversario}
@@ -103,5 +166,6 @@ def tela_carreira(request: Request):
             "time_escolhido": jogo.time_escolhido,
             "nome_save": jogo.nome_save,
             "proximo_jogo": _proximo_jogo(jogo),
+            "estatisticas": _estatisticas(jogo),
         },
     )

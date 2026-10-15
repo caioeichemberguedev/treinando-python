@@ -1,10 +1,12 @@
-"""E-019-T4: esqueleto do dashboard da carreira (`GET /carreira`).
+"""E-019-T4/T5: dashboard da carreira (`GET /carreira`).
 
 Cobre o bloco "Próximo jogo" em todos os estados (fase ainda não montada,
 confronto pendente, fase decidida sem seguir, bye, eliminado, campeão
-coroado), a ficha do time, os botões e a garantia de que o GET não muda
-estado nem grava. `DIR_SAVES` fica em `tmp_path` (fixture `saves_isolados`
-do `tests/conftest.py`).
+coroado), a ficha do time, os botões, as seções "Estatísticas da carreira"
+e "Histórico da carreira" (T5, inclusive o aviso de histórico incompleto,
+ID-014) e a garantia de que o GET não muda estado nem grava. `DIR_SAVES` e
+`catalogo_times.json` ficam em `tmp_path` (fixtures `saves_isolados` e
+`catalogo_isolado` do `tests/conftest.py`).
 """
 
 import json
@@ -16,10 +18,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+import catalogo
 import persistencia
 import web.estado as estado
 from campeonato import nome_da_fase
 from equipe import Equipe
+from estatisticas import resumo_da_carreira
 from web.main import app
 
 client = TestClient(app)
@@ -314,3 +318,228 @@ def test_get_carreira_com_campeao_nao_avanca_a_temporada():
     assert jogo.temporada == 2026
     assert jogo.campeao == jogo.time_escolhido
     assert caminho.read_bytes() == bytes_antes
+
+
+# --- E-019-T5: estatísticas e histórico da carreira --------------------------
+# Ids do catálogo real (1 a 4) para o nome do campeão vir do catálogo efetivo.
+
+ID_JOGADOR, ID_B, ID_C, ID_D = 1, 2, 3, 4
+
+HISTORICO_DUAS_TEMPORADAS = [
+    {
+        "temporada": 2026,
+        "campeao": ID_JOGADOR,
+        "fases": [
+            {
+                "nome_fase": "Semifinal - Copa Teste",
+                "confrontos": [[ID_JOGADOR, ID_B, ID_JOGADOR, 3, 1], [ID_C, ID_D, ID_D, 4, 2]],
+            },
+            {"nome_fase": "Final - Copa Teste", "confrontos": [[ID_JOGADOR, ID_D, ID_JOGADOR, 5, 4]]},
+        ],
+    },
+    {
+        "temporada": 2027,
+        "campeao": ID_C,
+        "fases": [
+            {
+                "nome_fase": "Semifinal - Copa Teste",
+                "confrontos": [[ID_B, ID_JOGADOR, ID_B, 2, 0], [ID_C, ID_D, ID_C, 3, 2]],
+            },
+            {"nome_fase": "Final - Copa Teste", "confrontos": [[ID_B, ID_C, ID_C, 1, 0]]},
+        ],
+    },
+]
+
+AVISO_INCOMPLETO = "Algumas fases não foram registradas"
+
+
+def _celula(rotulo, valor):
+    return f"<tr><th>{rotulo}</th><td>{valor}</td></tr>"
+
+
+def _jogo_com_historico(historico=HISTORICO_DUAS_TEMPORADAS, temporada=2028, **kwargs):
+    """Jogo em memória com `historico` (cópia profunda) e os times de ids 1 a
+    4 com nomes "Antigo <id>" (o catálogo efetivo é que dá o nome na tela)."""
+    times = [Equipe(f"Antigo {i}", id=i) for i in (ID_JOGADOR, ID_B, ID_C, ID_D)]
+    copia = json.loads(json.dumps(historico))
+    return estado.iniciar_jogo("Copa Teste", times[0], temporada, times, historico=copia, **kwargs)
+
+
+def _temporada_com_primeira_fase(confrontos_na_primeira_fase):
+    return {
+        "temporada": 2026,
+        "campeao": ID_B,
+        "fases": [
+            {
+                "nome_fase": "Fase - Copa Teste",
+                "confrontos": [[ID_B, ID_C, ID_B, 1, 0]] * confrontos_na_primeira_fase,
+            }
+        ],
+    }
+
+
+def _dezesseis_times():
+    return [Equipe(f"T{i}", id=i) for i in range(1, 17)]
+
+
+def test_estatisticas_batem_com_resumo_da_carreira():
+    _jogo_com_historico()
+    esperado = resumo_da_carreira(HISTORICO_DUAS_TEMPORADAS, ID_JOGADOR)
+    assert esperado["jogos"] == 3  # conferência do exemplo escrito à mão
+
+    html = client.get("/carreira").text
+
+    assert "Estatísticas da carreira" in html
+    assert _celula("Jogos", esperado["jogos"]) in html
+    assert _celula("Vitórias", esperado["vitorias"]) in html
+    assert _celula("Derrotas", esperado["derrotas"]) in html
+    assert _celula("Aproveitamento", f"{esperado['aproveitamento']}%") in html
+    assert _celula("Gols de pênalti marcados", esperado["gols_marcados"]) in html
+    assert _celula("Gols de pênalti sofridos", esperado["gols_sofridos"]) in html
+    assert _celula("Títulos na carreira", esperado["titulos"]) in html
+    assert _celula("Melhor campanha", "Campeão (2026)") in html
+
+
+def test_historico_da_carreira_tem_uma_linha_por_temporada_com_link():
+    _jogo_com_historico()
+
+    html = client.get("/carreira").text
+
+    assert "Histórico da carreira" in html
+    assert re.search(r'<a href="[^"]*/historico/1/jogos">2026</a>', html)
+    assert re.search(r'<a href="[^"]*/historico/2/jogos">2027</a>', html)
+    assert "<td>Campeão</td>" in html
+    assert "<td>Eliminado na Semifinal</td>" in html
+    assert catalogo.nome_do_time(ID_JOGADOR) in html
+    assert catalogo.nome_do_time(ID_C) in html
+    # Temporada em andamento: sem link e campeão "—".
+    assert "<td>2028</td>" in html
+    assert "<td>Em andamento</td>" in html
+    assert "<td>—</td>" in html
+    assert "/historico/3/jogos" not in html
+
+
+def test_temporada_em_andamento_entra_nas_estatisticas():
+    jogo = _jogo_com_historico()
+    a, b, c, d = jogo.classificados
+    jogo.fases_da_temporada = [
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 4, 3), (c, d, d, 1, 0)]},
+    ]
+
+    html = client.get("/carreira").text
+
+    # 3 jogos do histórico + a semifinal de 2028 (vitória por 4x3).
+    assert _celula("Jogos", 4) in html
+    assert _celula("Vitórias", 3) in html
+    assert _celula("Gols de pênalti marcados", 12) in html
+    assert "<td>Em andamento</td>" in html
+
+
+def test_eliminado_na_temporada_em_andamento_usa_a_campanha():
+    jogo = _jogo_com_historico()
+    a, b, c, d = jogo.classificados
+    jogo.fases_da_temporada = [
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, b, 1, 3), (c, d, d, 1, 0)]},
+    ]
+    jogo.classificados = [b, d]
+
+    html = client.get("/carreira").text
+
+    assert "<p>Eliminado na Semifinal.</p>" in html
+    assert "<td>Eliminado na Semifinal</td>" in html
+    assert "Semifinal - Copa Teste" not in html
+
+
+def test_campeao_coroado_nao_conta_a_temporada_em_dobro():
+    temporada_2028 = {
+        "temporada": 2028,
+        "campeao": ID_JOGADOR,
+        "fases": [
+            {
+                "nome_fase": "Semifinal - Copa Teste",
+                "confrontos": [[ID_JOGADOR, ID_B, ID_JOGADOR, 3, 0], [ID_C, ID_D, ID_C, 2, 1]],
+            },
+            {"nome_fase": "Final - Copa Teste", "confrontos": [[ID_JOGADOR, ID_C, ID_JOGADOR, 4, 2]]},
+        ],
+    }
+    historico = HISTORICO_DUAS_TEMPORADAS + [temporada_2028]
+    jogo = _jogo_com_historico(historico=historico)
+    a, b, c, d = jogo.classificados
+    # Antes de `/campeao/continuar`: a temporada já está no histórico E ainda
+    # em `fases_da_temporada`.
+    jogo.fases_da_temporada = [
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 3, 0), (c, d, c, 2, 1)]},
+        {"nome_fase": "Final - Copa Teste", "confrontos": [(a, c, a, 4, 2)]},
+    ]
+    jogo.campeao = a
+    esperado = resumo_da_carreira(historico, ID_JOGADOR)
+    assert esperado["jogos"] == 5
+
+    html = client.get("/carreira").text
+
+    assert _celula("Jogos", 5) in html
+    assert _celula("Títulos na carreira", 2) in html
+    assert _celula("Melhor campanha", "Campeão (2026, 2028)") in html
+    assert html.count(">2028</a>") == 1
+    assert "<td>2028</td>" not in html
+    assert "Em andamento" not in html
+
+
+def test_sem_jogos_mostra_aproveitamento_traco_e_nenhuma_temporada():
+    times = _times(4)
+    estado.iniciar_jogo("Copa Teste", times[0], 2026, times)
+
+    html = client.get("/carreira").text
+
+    assert _celula("Jogos", 0) in html
+    assert _celula("Aproveitamento", "—") in html
+    assert _celula("Melhor campanha", "Nenhuma temporada concluída ainda") in html
+    assert _celula("Títulos na carreira", 0) in html
+
+
+def test_temporada_que_comeca_nas_quartas_mostra_aviso_de_historico_incompleto():
+    _jogo_com_historico(
+        historico=[_temporada_com_primeira_fase(4)], temporada=2027, times_do_campeonato=_dezesseis_times()
+    )
+
+    assert AVISO_INCOMPLETO in client.get("/carreira").text
+
+
+def test_temporada_completa_nao_mostra_aviso():
+    _jogo_com_historico(
+        historico=[_temporada_com_primeira_fase(8)], temporada=2027, times_do_campeonato=_dezesseis_times()
+    )
+
+    assert AVISO_INCOMPLETO not in client.get("/carreira").text
+
+
+def test_sem_times_do_campeonato_nao_mostra_aviso():
+    _jogo_com_historico(historico=[_temporada_com_primeira_fase(4)], temporada=2027)
+
+    assert AVISO_INCOMPLETO not in client.get("/carreira").text
+
+
+def test_campeao_do_historico_usa_o_nome_editado_pelo_adm():
+    _jogo_com_historico()
+    catalogo.salvar_time_no_catalogo(ID_C, "Campeão Editado Adm", ["#112233"])
+    catalogo.limpar_cache()
+
+    html = client.get("/carreira").text
+
+    assert "Campeão Editado Adm" in html
+    assert "Antigo 3" not in html
+
+
+def test_get_carreira_com_estatisticas_nao_altera_historico_nem_fases():
+    jogo = _jogo_com_historico()
+    a, b, c, d = jogo.classificados
+    jogo.fases_da_temporada = [
+        {"nome_fase": "Semifinal - Copa Teste", "confrontos": [(a, b, a, 4, 3), (c, d, d, 1, 0)]},
+    ]
+    historico_antes = json.dumps(jogo.historico)
+    fases_antes = [dict(fase, confrontos=list(fase["confrontos"])) for fase in jogo.fases_da_temporada]
+
+    client.get("/carreira")
+
+    assert json.dumps(jogo.historico) == historico_antes
+    assert jogo.fases_da_temporada == fases_antes

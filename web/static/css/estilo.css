@@ -109,3 +109,14 @@ th, td {
 .acoes form {
     margin: 0;
 }
+
+/* Aviso de estatísticas incompletas (ID-014) e tabela do histórico */
+.aviso {
+    border-left: 4px solid var(--cor-destaque);
+    padding: 0.5rem var(--espacamento);
+    color: var(--cor-destaque);
+}
+
+.tabela-rolavel {
+    overflow-x: auto;
+}

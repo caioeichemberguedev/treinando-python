@@ -27,8 +27,8 @@
         {% elif proximo_jogo.situacao == "bye" %}
             <p>{{ proximo_jogo.nome_fase }}: seu time avança direto.</p>
         {% else %}
-            {% if proximo_jogo.fase_eliminacao %}
-                <p>Eliminado na {{ proximo_jogo.fase_eliminacao }}.</p>
+            {% if proximo_jogo.rotulo_eliminacao %}
+                <p>{{ proximo_jogo.rotulo_eliminacao }}.</p>
             {% else %}
                 <p>Eliminado nesta temporada.</p>
             {% endif %}
@@ -46,6 +46,54 @@
                 <tr><th>Títulos</th><td>{{ time_escolhido.titulos }}</td></tr>
             </tbody>
         </table>
+    </section>
+
+    {% set resumo = estatisticas.resumo %}
+    <section class="painel">
+        <h2>Estatísticas da carreira</h2>
+        {% if estatisticas.incompleto %}
+            <p class="aviso">Algumas fases não foram registradas (carreira retomada no meio de uma temporada) — as estatísticas podem estar incompletas.</p>
+        {% endif %}
+        <table>
+            <tbody>
+                <tr><th>Jogos</th><td>{{ resumo.jogos }}</td></tr>
+                <tr><th>Vitórias</th><td>{{ resumo.vitorias }}</td></tr>
+                <tr><th>Derrotas</th><td>{{ resumo.derrotas }}</td></tr>
+                <tr><th>Aproveitamento</th><td>{% if resumo.aproveitamento is none %}—{% else %}{{ "%.1f"|format(resumo.aproveitamento) }}%{% endif %}</td></tr>
+                <tr><th>Gols de pênalti marcados</th><td>{{ resumo.gols_marcados }}</td></tr>
+                <tr><th>Gols de pênalti sofridos</th><td>{{ resumo.gols_sofridos }}</td></tr>
+                <tr><th>Títulos na carreira</th><td>{{ resumo.titulos }}</td></tr>
+                <tr><th>Melhor campanha</th><td>{% if estatisticas.melhor %}{{ estatisticas.melhor.rotulo }} ({{ estatisticas.melhor.temporadas|join(", ") }}){% else %}Nenhuma temporada concluída ainda{% endif %}</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="painel">
+        <h2>Histórico da carreira</h2>
+        {% if not estatisticas.linhas %}
+            <p>Nenhuma temporada registrada ainda.</p>
+        {% else %}
+            <div class="tabela-rolavel">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Temporada</th>
+                            <th>Campanha</th>
+                            <th>Campeão</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for linha in estatisticas.linhas %}
+                        <tr>
+                            <td>{% if linha.indice %}<a href="{{ url_for('tela_historico_jogos', indice=linha.indice) }}">{{ linha.campanha.temporada }}</a>{% else %}{{ linha.campanha.temporada }}{% endif %}</td>
+                            <td>{{ linha.campanha.rotulo }}</td>
+                            <td>{% if linha.campeao is none %}—{% else %}<span class="time">{{ escudo(linha.campeao, 20) }}{{ nome_time(linha.campeao) }}</span>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
     </section>
 
     <div class="acoes">
