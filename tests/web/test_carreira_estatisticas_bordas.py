@@ -1,9 +1,10 @@
 """E-019-T5 (bordas, tester): estatísticas e histórico do dashboard pelo
 fluxo real da web — temporadas jogadas de verdade, campeão coroado antes e
 depois de `/campeao/continuar`, carreira retomada no meio da temporada
-(aviso de histórico incompleto, ID-014) e links do histórico apontando para
-a temporada certa. `DIR_SAVES` e o catálogo ficam em `tmp_path` (fixtures
-do `tests/conftest.py`).
+(fases preservadas, E-014; aviso de histórico incompleto só em save
+antigo, ID-014) e links do histórico apontando para a temporada certa.
+`DIR_SAVES` e o catálogo ficam em `tmp_path` (fixtures do
+`tests/conftest.py`).
 """
 
 import json
@@ -179,15 +180,54 @@ def test_varias_temporadas_links_apontam_para_a_temporada_certa():
     assert AVISO_INCOMPLETO not in html
 
 
-def test_carreira_retomada_no_meio_mostra_aviso_so_depois_de_uma_fase_parcial():
+def _regravar_como_save_antigo(nome_save):
+    """Regrava o save sem as fases da temporada em andamento, como ficava um
+    save gravado no meio da temporada antes do E-014 (v1 migrado)."""
+    dados = persistencia.carregar_jogo_salvo(nome_save)
+    persistencia.salvar_jogo(
+        nome_save,
+        dados["campeonato"],
+        dados["time_escolhido"],
+        dados["temporada"],
+        dados["classificados"],
+        dados["historico"],
+        [],
+    )
+
+
+def test_carreira_retomada_no_meio_preserva_as_fases_e_nunca_mostra_aviso():
     jogo = _novo_jogo(11)
     _jogar_e_seguir()  # quartas decididas e gravadas
     nome_save = jogo.nome_save
     assert nome_save
-    html_completo = client.get("/carreira").text
-    assert AVISO_INCOMPLETO not in html_completo
+    fases_antes = json.loads(json.dumps(jogo.fases_da_temporada))
+    assert AVISO_INCOMPLETO not in client.get("/carreira").text
 
     estado.encerrar_jogo()
+    resposta = client.post(f"/saves/{nome_save}/carregar", follow_redirects=False)
+    assert resposta.status_code == 303
+    jogo = estado.obter_jogo()
+    assert jogo.fases_da_temporada == fases_antes
+
+    html = client.get("/carreira").text
+    assert AVISO_INCOMPLETO not in html
+
+    _jogar_e_seguir()  # semifinal
+    assert AVISO_INCOMPLETO not in client.get("/carreira").text
+
+    _jogar_ate_campeao(jogo)
+    assert [len(f["confrontos"]) for f in jogo.historico[-1]["fases"]] == [4, 2, 1]
+    client.post("/campeao/continuar", follow_redirects=False)
+    assert AVISO_INCOMPLETO not in client.get("/carreira").text
+
+
+def test_save_antigo_retomado_no_meio_mostra_aviso_so_depois_de_uma_fase_parcial():
+    jogo = _novo_jogo(11)
+    _jogar_e_seguir()  # quartas decididas e gravadas
+    nome_save = jogo.nome_save
+    estado.encerrar_jogo()
+    _regravar_como_save_antigo(nome_save)
+
     resposta = client.post(f"/saves/{nome_save}/carregar", follow_redirects=False)
     assert resposta.status_code == 303
     jogo = estado.obter_jogo()

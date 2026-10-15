@@ -186,3 +186,63 @@ def test_encerrar_jogo_sem_jogo_em_andamento_nao_quebra():
     encerrar_jogo()
 
     assert obter_jogo() is None
+
+
+# --- E-014-T5: fases da temporada em andamento ---------------------------------
+
+FASES_EM_ANDAMENTO = [
+    {"nome_fase": "Semifinal - Campeonato Teste", "confrontos": [[901, 902, 901, 2, 1], [903, 904, 903, 1, 0]]},
+]
+
+
+def test_iniciar_jogo_sem_fases_da_temporada_comeca_com_lista_vazia():
+    jogo = iniciar_jogo("Campeonato Teste", _time_escolhido(), 2026, _classificados())
+
+    assert jogo.fases_da_temporada == []
+
+
+def test_iniciar_jogo_copia_as_fases_da_temporada_recebidas():
+    fases = list(FASES_EM_ANDAMENTO)
+
+    jogo = iniciar_jogo("Campeonato Teste", _time_escolhido(), 2026, _classificados(), fases_da_temporada=fases)
+
+    assert jogo.fases_da_temporada == FASES_EM_ANDAMENTO
+    assert jogo.fases_da_temporada is not fases
+    fases.append({"nome_fase": "Final", "confrontos": []})
+    assert len(jogo.fases_da_temporada) == 1
+
+
+def test_salvar_jogo_em_andamento_no_meio_grava_as_fases_da_temporada(dir_saves):
+    time_a, time_b, _ = _times_com_id()
+    jogo = iniciar_jogo("Campeonato Teste", time_a, 2026, [time_a, time_b], nome_save=NOME_SAVE,
+                        fases_da_temporada=FASES_EM_ANDAMENTO)
+
+    salvar_jogo_em_andamento(jogo, 2026, [time_a, time_b])
+
+    assert persistencia.carregar_jogo_salvo(NOME_SAVE)["fases_da_temporada"] == FASES_EM_ANDAMENTO
+
+
+def test_salvar_jogo_em_andamento_com_classificados_none_grava_fases_vazias(dir_saves):
+    time_a, time_b, _ = _times_com_id()
+    jogo = iniciar_jogo("Campeonato Teste", time_a, 2026, [time_a, time_b], nome_save=NOME_SAVE,
+                        fases_da_temporada=FASES_EM_ANDAMENTO)
+    salvar_jogo_em_andamento(jogo, 2026, [time_a, time_b])
+
+    salvar_jogo_em_andamento(jogo, 2027, None)
+
+    dados = persistencia.carregar_jogo_salvo(NOME_SAVE)
+    assert dados["classificados"] is None
+    assert dados["fases_da_temporada"] == []
+    assert jogo.fases_da_temporada == FASES_EM_ANDAMENTO  # a memória não muda
+
+
+def test_salvar_jogo_em_andamento_com_fases_explicitas_usa_as_recebidas(dir_saves):
+    """A nova tentativa do save pendente (E-015) grava as fases do momento
+    da falha, não as da memória atual."""
+    time_a, time_b, _ = _times_com_id()
+    jogo = iniciar_jogo("Campeonato Teste", time_a, 2026, [time_a, time_b], nome_save=NOME_SAVE,
+                        fases_da_temporada=FASES_EM_ANDAMENTO)
+
+    salvar_jogo_em_andamento(jogo, 2026, [time_a, time_b], [])
+
+    assert persistencia.carregar_jogo_salvo(NOME_SAVE)["fases_da_temporada"] == []

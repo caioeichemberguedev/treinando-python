@@ -180,9 +180,32 @@ def test_carreira_da_web_salva_no_meio_e_concluida_pelo_terminal(monkeypatch):
     assert len(dados["historico"]) == 1
     temporada = dados["historico"][0]
     assert temporada["temporada"] == 2026
-    # ID-014: as oitavas (jogadas na web antes do "sair") não entram.
-    assert [len(fase["confrontos"]) for fase in temporada["fases"]] == [4, 2, 1]
+    # E-014: as oitavas (jogadas na web antes do "sair") também entram.
+    assert [len(fase["confrontos"]) for fase in temporada["fases"]] == [8, 4, 2, 1]
     assert temporada["campeao"] in ids_quartas
+
+
+def test_carreira_da_web_salva_depois_das_oitavas_e_concluida_pela_web_guarda_as_4_fases():
+    """Cenário do E-014 na web: decidir as oitavas, "Seguir", fechar o jogo,
+    continuar a carreira e terminar → histórico com as 4 fases."""
+    jogo = _novo_jogo_web()
+    nome_save = jogo.nome_save
+    _decidir_fase_atual()  # oitavas
+    oitavas = jogo.fases_da_temporada[0]
+    client.post("/fase/seguir", follow_redirects=False)
+    estado.encerrar_jogo()
+
+    jogo = _continuar_pela_tela_de_saves(client, nome_save)
+    assert jogo.fases_da_temporada == [oitavas]
+
+    assert _jogar_ate_o_campeao() == 3
+    dados = persistencia.carregar_jogo_salvo(nome_save)
+    temporada = dados["historico"][0]
+    assert [len(fase["confrontos"]) for fase in temporada["fases"]] == [8, 4, 2, 1]
+    assert temporada["fases"][0] == oitavas
+    assert temporada["campeao"] == jogo.campeao.id == temporada["fases"][-1]["confrontos"][0][2]
+    assert dados["historico"] == jogo.historico
+    assert dados["fases_da_temporada"] == []
 
 
 def test_carreira_da_web_concluida_pelo_terminal_volta_para_a_web(monkeypatch):
@@ -232,7 +255,7 @@ def test_carreira_do_terminal_continuada_pela_web_ate_o_campeao(monkeypatch):
     assert dados["historico"] == jogo.historico
     assert len(dados["historico"]) == 1
     assert dados["historico"][0]["campeao"] == jogo.campeao.id
-    assert [len(fase["confrontos"]) for fase in dados["historico"][0]["fases"]] == [4, 2, 1]
+    assert [len(fase["confrontos"]) for fase in dados["historico"][0]["fases"]] == [8, 4, 2, 1]
 
 
 # --- cenário 3: reinício do servidor ----------------------------------------

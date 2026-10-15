@@ -50,7 +50,10 @@ def carregar_save(nome_save: str):
     Quando `classificados` é `None` (temporada nova ainda não sorteada),
     sorteia a partir do elenco base do campeonato e grava o sorteio no mesmo
     arquivo — igual `rodar_temporada` faz no terminal. Com `classificados`
-    já preenchidos (carreira salva no meio da temporada), não grava nada.
+    já preenchidos (carreira salva no meio da temporada), não grava nada e
+    as fases já jogadas da temporada voltam do save para
+    `jogo.fases_da_temporada` (E-014) — o histórico da temporada fica
+    completo ao terminar. Com `classificados` `None` elas já vêm vazias.
 
     O roster completo do campeonato (`times`) é sempre recarregado aqui e
     guardado em `times_do_campeonato`, independente de `classificados` já vir
@@ -88,6 +91,7 @@ def carregar_save(nome_save: str):
         historico=dados.get("historico", []),
         times_do_campeonato=times,
         nome_save=nome_save,
+        fases_da_temporada=dados.get("fases_da_temporada", []),
     )
     if sorteou:
         salvar_jogo_em_andamento(jogo, jogo.temporada, jogo.classificados)

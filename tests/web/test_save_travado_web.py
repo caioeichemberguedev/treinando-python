@@ -135,10 +135,12 @@ def test_salvar_em_andamento_devolve_false_e_guarda_o_retrato_pendente(travado):
 
     assert estado.salvar_jogo_em_andamento(jogo, 2030, classificados) is False
 
-    temporada, pendentes = jogo.save_pendente
+    temporada, pendentes, fases = jogo.save_pendente
     assert temporada == 2030
     assert _ids(pendentes) == _ids(classificados)
     assert pendentes is not classificados  # cópia: o retrato não muda junto
+    assert fases == jogo.fases_da_temporada == []
+    assert fases is not jogo.fases_da_temporada
 
 
 def test_salvar_em_andamento_com_sucesso_limpa_o_pendente(travado, monkeypatch):
@@ -166,7 +168,7 @@ def test_novo_jogo_com_save_travado_segue_em_memoria(travado):
 
     assert travado.tentativas == 1
     assert jogo is not None
-    assert jogo.save_pendente == (2026, jogo.classificados)
+    assert jogo.save_pendente == (2026, jogo.classificados, [])
     assert not _caminho_save(jogo).exists()
 
 
@@ -176,10 +178,12 @@ def test_fase_decidida_pela_ultima_cobranca_com_save_travado(travado):
     _decidir_fase_atual()
 
     assert jogo.fase_atual["confronto_pendente"] is None
-    temporada, pendentes = jogo.save_pendente
+    temporada, pendentes, fases = jogo.save_pendente
     assert temporada == 2026
     assert _ids(pendentes) == _ids(jogo.fase_atual["proximos"])
     assert len(pendentes) == 2
+    assert fases == jogo.fases_da_temporada  # inclui a fase que acabou de fechar
+    assert len(fases) == 1
 
 
 def test_final_e_proxima_temporada_com_save_travado(travado):
@@ -188,7 +192,7 @@ def test_final_e_proxima_temporada_com_save_travado(travado):
     _jogar_temporada_ate_o_campeao()
 
     assert jogo.campeao is not None
-    assert jogo.save_pendente == (2027, None)
+    assert jogo.save_pendente == (2027, None, [])
     assert len(jogo.historico) == 1
 
     resposta = client.post("/campeao/continuar", follow_redirects=False)
@@ -197,9 +201,10 @@ def test_final_e_proxima_temporada_com_save_travado(travado):
     assert resposta.headers["location"] == "/carreira"
     assert jogo.temporada == 2027
     assert jogo.campeao is None
-    temporada, pendentes = jogo.save_pendente
+    temporada, pendentes, fases = jogo.save_pendente
     assert temporada == 2027
     assert _ids(pendentes) == _ids(jogo.classificados)
+    assert fases == []
     assert client.get("/carreira").status_code == 200
 
 
@@ -319,8 +324,9 @@ def test_carregar_save_entre_temporadas_com_save_travado(monkeypatch):
     assert resposta.headers["location"] == "/carreira"
     carregado = estado.obter_jogo()
     assert falso.tentativas == 1
-    temporada, pendentes = carregado.save_pendente
+    temporada, pendentes, fases = carregado.save_pendente
     assert temporada == 2027
+    assert fases == []
     assert _ids(pendentes) == _ids(carregado.classificados)
     assert _caminho_save(carregado).read_bytes() == bytes_antes
     assert _mostra_aviso(client.get("/carreira").text)
@@ -396,3 +402,41 @@ def test_aviso_usa_form_post_sem_javascript(travado):
     assert '<form method="post" action="' in html
     assert '/carreira/salvar"' in html
     assert "<script" not in html.lower()
+
+
+# --- E-014-T5: o retrato pendente inclui as fases da temporada ----------------
+
+def test_tentar_de_novo_grava_as_fases_do_momento_da_falha(travado, monkeypatch):
+    jogo = _novo_jogo("Copa Teste", 905)
+    _decidir_fase_atual()  # semifinal fechada, gravação falha
+    fases_da_falha = json.loads(json.dumps(jogo.fases_da_temporada))
+    assert len(fases_da_falha) == 1
+    assert jogo.save_pendente[2] == fases_da_falha
+    assert jogo.save_pendente[2] is not jogo.fases_da_temporada
+
+    # A memória segue mudando depois da falha: o retrato pendente não muda.
+    jogo.fases_da_temporada.append({"nome_fase": "Fase fantasma", "confrontos": []})
+    assert jogo.save_pendente[2] == fases_da_falha
+
+    destravar(monkeypatch)
+    resposta = client.post("/carreira/salvar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert jogo.save_pendente is None
+    dados = persistencia.carregar_jogo_salvo(jogo.nome_save)
+    assert dados["temporada"] == 2026
+    assert len(dados["classificados"]) == 2
+    assert dados["fases_da_temporada"] == fases_da_falha
+
+
+def test_tentar_de_novo_nao_muta_as_fases_ja_fechadas(travado, monkeypatch):
+    jogo = _novo_jogo("Copa Teste", 905)
+    _decidir_fase_atual()
+    fase_fechada = jogo.fases_da_temporada[0]
+    antes = json.dumps(fase_fechada)
+
+    destravar(monkeypatch)
+    client.post("/carreira/salvar", follow_redirects=False)
+
+    assert jogo.fases_da_temporada[0] is fase_fechada
+    assert json.dumps(fase_fechada) == antes

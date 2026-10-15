@@ -44,7 +44,10 @@ class EstadoJogo:
     MESMO formato de ids das fases do histórico (cada uma vem de
     `campeonato.registro_da_fase`: `{"nome_fase", "confrontos": [[id_a,
     id_b, id_vencedor, gols_a, gols_b], ...]}`) — nada de objetos `Equipe`,
-    então pode ir direto para o histórico/save.
+    então pode ir direto para o histórico/save. Desde o E-014 elas também
+    são gravadas no save enquanto a temporada está em andamento e voltam ao
+    carregar, então retomar no meio não perde as fases já jogadas. Uma fase
+    já fechada nunca é alterada (o `historico` compartilha os mesmos dicts).
 
     `historico` guarda as temporadas já concluídas desta carreira, no mesmo
     formato usado por `persistencia`/`menu.py`: uma lista de dicts
@@ -71,10 +74,11 @@ class EstadoJogo:
     carregado. `None` só em estado montado à mão (testes) — jogo só em
     memória, que `salvar_jogo_em_andamento` nunca grava.
 
-    `save_pendente` é o retrato `(temporada, classificados)` da última
-    gravação que falhou porque o save estava travado (E-015) — exatamente
-    os argumentos que `salvar_jogo_em_andamento` recebeu, para tentar de
-    novo depois. `None` quando a última gravação deu certo (ou nenhuma
+    `save_pendente` é o retrato `(temporada, classificados,
+    fases_da_temporada)` da última gravação que falhou porque o save estava
+    travado (E-015) — os argumentos de `salvar_jogo_em_andamento` com as
+    fases do momento da falha (E-014), para tentar de novo depois
+    (`salvar_jogo_em_andamento(jogo, *jogo.save_pendente)`). `None` quando a última gravação deu certo (ou nenhuma
     falhou). Cada save é um retrato completo da carreira, então basta
     guardar o mais recente: se outra gravação falhar, ele é substituído.
     """
@@ -104,11 +108,14 @@ def iniciar_jogo(
     historico: list | None = None,
     times_do_campeonato: list[Equipe] | None = None,
     nome_save: str | None = None,
+    fases_da_temporada: list | None = None,
 ) -> EstadoJogo:
     """Cria um novo jogo em andamento, substituindo o anterior (se houver).
 
-    `historico` e `times_do_campeonato` são copiados (nunca guardados por
-    referência) — a lista em si nunca é a mesma recebida pelo chamador,
+    `historico`, `times_do_campeonato` e `fases_da_temporada` (fases já
+    fechadas da temporada atual, formato de ids do histórico — vêm do save
+    ao carregar no meio da temporada, E-014) são copiados (nunca guardados
+    por referência) — a lista em si nunca é a mesma recebida pelo chamador,
     embora os objetos `Equipe` dentro de `times_do_campeonato` continuem
     sendo os mesmos (por identidade) que os de `classificados`, de propósito.
     `nome_save` amarra o jogo ao arquivo da carreira em `saves/`.
@@ -120,6 +127,7 @@ def iniciar_jogo(
         temporada=temporada,
         classificados=classificados,
         historico=list(historico) if historico is not None else [],
+        fases_da_temporada=list(fases_da_temporada) if fases_da_temporada is not None else [],
         times_do_campeonato=list(times_do_campeonato) if times_do_campeonato is not None else [],
         nome_save=nome_save,
     )
@@ -142,6 +150,7 @@ def salvar_jogo_em_andamento(
     jogo: EstadoJogo,
     temporada: int,
     classificados: list[Equipe] | None,
+    fases_da_temporada: list | None = None,
 ) -> bool:
     """Grava a carreira de `jogo` em `saves/<jogo.nome_save>.db`.
 
@@ -152,17 +161,30 @@ def salvar_jogo_em_andamento(
     temporada nova, ainda não sorteada. Campeonato, time escolhido e
     histórico vêm do `jogo`.
 
+    Fases da temporada em andamento (E-014): com `classificados=None`
+    (temporada nova / campeão coroado) grava `[]`; nos demais casos grava
+    `fases_da_temporada` se informado (a nova tentativa do save pendente,
+    com as fases do momento da falha) ou, por padrão,
+    `jogo.fases_da_temporada` (inclusive a fase que acabou de fechar).
+
     Não faz nada se `jogo.nome_save` for `None` (jogo só em memória) e
     devolve `True` (não há o que ficar pendente).
 
     Se o save estiver travado (`persistencia.SaveTravado`, E-015), não
-    levanta: guarda `(temporada, classificados)` em `jogo.save_pendente`
-    (com uma cópia da lista, para o retrato não mudar junto com a memória)
-    e devolve `False` — o jogo segue em memória e a página mostra o aviso.
+    levanta: guarda `(temporada, classificados, fases)` em
+    `jogo.save_pendente` (com cópias das listas, para o retrato não mudar
+    junto com a memória — as fases fechadas em si nunca mudam) e devolve
+    `False` — o jogo segue em memória e a página mostra o aviso.
     Gravou → limpa `jogo.save_pendente` e devolve `True`.
     """
     if jogo.nome_save is None:
         return True
+    if classificados is None:
+        fases = []
+    elif fases_da_temporada is not None:
+        fases = list(fases_da_temporada)
+    else:
+        fases = list(jogo.fases_da_temporada)
     try:
         persistencia.salvar_jogo(
             jogo.nome_save,
@@ -171,10 +193,11 @@ def salvar_jogo_em_andamento(
             temporada,
             classificados,
             jogo.historico,
+            fases,
         )
     except persistencia.SaveTravado:
         copia = list(classificados) if classificados is not None else None
-        jogo.save_pendente = (temporada, copia)
+        jogo.save_pendente = (temporada, copia, fases)
         return False
     jogo.save_pendente = None
     return True

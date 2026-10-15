@@ -11,7 +11,8 @@ Cenários:
 3. Duas temporadas completas: estatísticas do dashboard iguais a
    `resumo_da_carreira` do histórico lido do save.
 4. Carreira criada no terminal, saída depois das oitavas, carregada na web:
-   cai no dashboard; ao concluir a temporada aparece o aviso de histórico
+   cai no dashboard e a temporada fecha com as 4 fases, sem aviso (E-014);
+   num save antigo (sem as fases em andamento) aparece o aviso de histórico
    incompleto (ID-014) e a campanha da temporada não quebra.
 5. "Voltar ao menu" (`GET /`) + "Continuar" em `/saves` → dashboard com os
    mesmos números.
@@ -320,9 +321,25 @@ def _criar_carreira_pelo_terminal_e_sair_depois_das_oitavas(monkeypatch, semente
     return saves[0]
 
 
+def _regravar_como_save_antigo(nome_save):
+    """Regrava o save sem as fases da temporada em andamento — igual a um
+    save gravado no meio da temporada antes do E-014 (v1 migrado)."""
+    dados = persistencia.carregar_jogo_salvo(nome_save)
+    assert dados["fases_da_temporada"]  # o terminal novo grava as oitavas
+    persistencia.salvar_jogo(
+        nome_save,
+        dados["campeonato"],
+        dados["time_escolhido"],
+        dados["temporada"],
+        dados["classificados"],
+        dados["historico"],
+        [],
+    )
+
+
 # Sementes do terminal: na 3 o São Paulo passa das oitavas; na 1 cai nelas.
 @pytest.mark.parametrize(("semente", "passou_das_oitavas"), [(3, True), (1, False)])
-def test_carreira_do_terminal_carregada_na_web_abre_o_dashboard_e_avisa_historico_incompleto(
+def test_carreira_do_terminal_carregada_na_web_abre_o_dashboard_com_a_temporada_completa(
     monkeypatch, semente, passou_das_oitavas
 ):
     nome_save = _criar_carreira_pelo_terminal_e_sair_depois_das_oitavas(monkeypatch, semente)
@@ -335,16 +352,58 @@ def test_carreira_do_terminal_carregada_na_web_abre_o_dashboard_e_avisa_historic
     assert resposta.status_code == 303
     assert resposta.headers["location"] == "/carreira"
     jogo = estado.obter_jogo()
+    assert [len(fase["confrontos"]) for fase in jogo.fases_da_temporada] == [8]
 
     html = _dashboard()
     assert "Temporada 2026" in html
     assert f"Carreira: <strong>{nome_save}</strong>" in html
-    assert AVISO_INCOMPLETO not in html  # nada registrado ainda: nada a julgar
+    assert AVISO_INCOMPLETO not in html
     if passou_das_oitavas:
         assert len(_times_do_proximo_jogo(html)) == 2
         assert f"{nome_da_fase(4)}:" in _secao(html, "Próximo jogo")
     else:
-        assert "<p>Eliminado nesta temporada.</p>" in html  # oitavas perdidas (ID-014)
+        assert f"<p>Eliminado na {OITAVAS}.</p>" in html  # as oitavas vieram do save
+
+    _jogar_temporada_pelo_dashboard(_disputar_no_canto_1)
+
+    html = _dashboard()
+    assert AVISO_INCOMPLETO not in html
+    historico = persistencia.carregar_jogo_salvo(nome_save)["historico"]
+    assert [len(fase["confrontos"]) for fase in historico[0]["fases"]] == [8, 4, 2, 1]
+    assert historico[0]["campeao"] == historico[0]["fases"][-1]["confrontos"][0][2]
+    campanha = campanha_na_temporada(historico[0], TIME_DO_JOGADOR)
+    assert campanha["rotulo"] != "Não registrada"
+    if not passou_das_oitavas:
+        assert campanha["rotulo"] == f"Eliminado na {OITAVAS}"
+    assert _linhas_do_historico(html) == [("2026", campanha["rotulo"])]
+    _assert_estatisticas(html, historico, TIME_DO_JOGADOR)
+
+    client.post("/campeao/continuar", follow_redirects=False)
+    html = _dashboard()
+    assert AVISO_INCOMPLETO not in html
+    assert _linhas_do_historico(html) == [("2026", campanha["rotulo"]), ("2027", "Em andamento")]
+    assert persistencia.listar_saves() == [nome_save]
+    assert jogo is estado.obter_jogo()
+
+
+@pytest.mark.parametrize(("semente", "passou_das_oitavas"), [(3, True), (1, False)])
+def test_save_antigo_do_terminal_carregado_na_web_avisa_historico_incompleto(
+    monkeypatch, semente, passou_das_oitavas
+):
+    """Save gravado no meio da temporada sem as fases (versão antiga do
+    jogo): o aviso de histórico incompleto continua aparecendo (ID-014)."""
+    nome_save = _criar_carreira_pelo_terminal_e_sair_depois_das_oitavas(monkeypatch, semente)
+    _regravar_como_save_antigo(nome_save)
+
+    resposta = client.post(f"/saves/{nome_save}/carregar", follow_redirects=False)
+    assert resposta.status_code == 303
+    jogo = estado.obter_jogo()
+    assert jogo.fases_da_temporada == []
+
+    html = _dashboard()
+    assert AVISO_INCOMPLETO not in html  # nada registrado ainda: nada a julgar
+    if not passou_das_oitavas:
+        assert "<p>Eliminado nesta temporada.</p>" in html  # oitavas perdidas
 
     _jogar_temporada_pelo_dashboard(_disputar_no_canto_1)
 
@@ -365,8 +424,6 @@ def test_carreira_do_terminal_carregada_na_web_abre_o_dashboard_e_avisa_historic
     html = _dashboard()
     assert AVISO_INCOMPLETO in html
     assert _linhas_do_historico(html) == [("2026", campanha["rotulo"]), ("2027", "Em andamento")]
-    assert persistencia.listar_saves() == [nome_save]
-    assert jogo is estado.obter_jogo()
 
 
 # --- cenário 5 -----------------------------------------------------------------

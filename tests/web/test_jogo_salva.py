@@ -514,12 +514,10 @@ def test_tela_da_fase_escapa_o_nome_da_carreira():
     assert "Carreira: <strong>&lt;b&gt;x&lt;/b&gt;</strong>" in resposta.text
 
 
-def test_fechar_e_continuar_a_cada_fase_ate_o_campeao_documenta_id_014():
+def test_fechar_e_continuar_a_cada_fase_ate_o_campeao_guarda_todas_as_fases():
     """Seguir + fechar o jogo + continuar a cada fase: tudo no mesmo arquivo
-    e a temporada fecha em 2027 com o histórico igual ao da memória.
-
-    Limitação conhecida (ID-014): fechar no meio da temporada perde as fases
-    anteriores no histórico — só a final entra."""
+    e a temporada fecha em 2027 com o histórico igual ao da memória — com
+    todas as fases, inclusive as jogadas antes de fechar (E-014)."""
     jogo = _novo_jogo("Copa Teste", 905)
     nome_save = jogo.nome_save
 
@@ -546,6 +544,6 @@ def test_fechar_e_continuar_a_cada_fase_ate_o_campeao_documenta_id_014():
     assert dados["temporada"] == 2027
     assert dados["classificados"] is None
     assert len(dados["historico"]) == 1
-    assert len(dados["historico"][0]["fases"]) == 1  # ID-014: muda para 2 quando for feito
+    assert [len(f["confrontos"]) for f in dados["historico"][0]["fases"]] == [2, 1]
     assert dados["historico"] == jogo.historico
     assert persistencia.listar_saves() == [nome_save]

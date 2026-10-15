@@ -37,8 +37,9 @@ _SEM_CARREIRA = (
 def _temporada_em_andamento(jogo: EstadoJogo) -> dict:
     """Temporada atual no formato de ids do histórico (`"campeao": None`),
     com uma cópia das fases já jogadas (`jogo.fases_da_temporada`, que já
-    estão no formato de ids). Ao retomar no meio da temporada as fases
-    anteriores não existem mais (ID-014) — a lista começa vazia."""
+    estão no formato de ids). Desde o E-014 as fases voltam do save ao
+    retomar no meio da temporada; só faltam em saves gravados no meio por
+    uma versão antiga do jogo (ID-014) — aí a lista começa vazia."""
     return {
         "temporada": jogo.temporada,
         "campeao": None,
@@ -64,7 +65,7 @@ def _temporadas_da_carreira(jogo: EstadoJogo) -> list[dict]:
 def _rotulo_da_eliminacao(jogo: EstadoJogo) -> str | None:
     """Rótulo "Eliminado na <fase>" da temporada em andamento, vindo de
     `campanha_na_temporada`. `None` quando a derrota não está registrada
-    (carreira carregada no meio da temporada, ID-014)."""
+    (save antigo gravado no meio da temporada sem as fases, ID-014)."""
     campanha = campanha_na_temporada(_temporada_em_andamento(jogo), jogo.time_escolhido.id)
     if campanha["profundidade"] is None:
         return None

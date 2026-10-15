@@ -37,12 +37,20 @@ def equipes_e_saves_de_teste(tmp_path, monkeypatch):
 
 
 def _criar_save(
-    nome, campeonato="Campeonato Teste", time_escolhido=None, temporada=2026, classificados="padrao", historico=None
+    nome,
+    campeonato="Campeonato Teste",
+    time_escolhido=None,
+    temporada=2026,
+    classificados="padrao",
+    historico=None,
+    fases_da_temporada=None,
 ):
     time_escolhido = time_escolhido or Equipe("Time A", id=901)
     if classificados == "padrao":
         classificados = [Equipe("Time A", id=901), Equipe("Time B", id=902)]
-    persistencia.salvar_jogo(nome, campeonato, time_escolhido, temporada, classificados, historico)
+    persistencia.salvar_jogo(
+        nome, campeonato, time_escolhido, temporada, classificados, historico, fases_da_temporada
+    )
 
 
 def test_tela_saves_sem_nenhuma_carreira_mostra_mensagem_vazia():
@@ -356,3 +364,45 @@ def test_carregar_entre_temporadas_sorteia_com_o_proprio_time_escolhido():
     assert _esta_na_lista(jogo.time_escolhido, jogo.classificados)
     assert _esta_na_lista(jogo.time_escolhido, jogo.times_do_campeonato)
     assert f"<th>Títulos</th><td>{esperado}</td>" in client.get("/carreira").text
+
+
+# --- E-014-T5: fases da temporada em andamento ---------------------------------
+
+FASES_EM_ANDAMENTO = [
+    {"nome_fase": "Semifinal - Campeonato Teste", "confrontos": [[901, 903, 901, 2, 1], [902, 904, 902, 1, 0]]},
+]
+
+
+def test_carregar_save_no_meio_da_temporada_devolve_as_fases_do_save():
+    _criar_save("1_01_01_2026", fases_da_temporada=FASES_EM_ANDAMENTO)
+
+    resposta = client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert estado.obter_jogo().fases_da_temporada == FASES_EM_ANDAMENTO
+
+
+def test_carregar_save_no_meio_com_fases_nao_grava_nada():
+    _criar_save("1_01_01_2026", fases_da_temporada=FASES_EM_ANDAMENTO)
+    antes = _bytes_do_save("1_01_01_2026")
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert _bytes_do_save("1_01_01_2026") == antes
+
+
+def test_carregar_save_antigo_sem_fases_comeca_com_lista_vazia():
+    _criar_save("1_01_01_2026")
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert estado.obter_jogo().fases_da_temporada == []
+
+
+def test_carregar_save_entre_temporadas_comeca_sem_fases_e_grava_vazio():
+    _criar_save("1_01_01_2026", temporada=2027, classificados=None)
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+
+    assert estado.obter_jogo().fases_da_temporada == []
+    assert persistencia.carregar_jogo_salvo("1_01_01_2026")["fases_da_temporada"] == []
