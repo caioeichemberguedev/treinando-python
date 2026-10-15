@@ -6,9 +6,14 @@ próximo jogo, a ficha do time, as estatísticas e o histórico da carreira
 (calculados por `estatisticas.py`) e os botões para continuar ou voltar ao
 menu — nunca muda o estado nem grava em `saves/` (a carreira já é gravada
 quando cada fase fica decidida, desde o E-018).
+
+`POST /carreira/salvar` (E-015) é a nova tentativa de gravação quando o save
+estava travado: grava o retrato pendente (`EstadoJogo.save_pendente`) e
+volta para o dashboard (PRG). É a única rota deste módulo que grava.
 """
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
 from campeonato import adversario_na_proxima_fase
 from estatisticas import (
@@ -18,10 +23,15 @@ from estatisticas import (
     resumo_da_carreira,
     temporada_completa,
 )
-from web.estado import EstadoJogo, obter_jogo
+from web.estado import EstadoJogo, obter_jogo, salvar_jogo_em_andamento
 from web.templates_config import templates
 
 router = APIRouter(tags=["carreira"])
+
+_SEM_CARREIRA = (
+    "Nenhuma carreira em andamento. Continue uma em "
+    '"Carreiras salvas" ou comece um novo jogo.'
+)
 
 
 def _temporada_em_andamento(jogo: EstadoJogo) -> dict:
@@ -146,13 +156,7 @@ def tela_carreira(request: Request):
     """Dashboard da carreira em andamento. Sem jogo → 404. Só leitura."""
     jogo = obter_jogo()
     if jogo is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Nenhuma carreira em andamento. Continue uma em "
-                '"Carreiras salvas" ou comece um novo jogo.'
-            ),
-        )
+        raise HTTPException(status_code=404, detail=_SEM_CARREIRA)
 
     return templates.TemplateResponse(
         request,
@@ -166,3 +170,18 @@ def tela_carreira(request: Request):
             "estatisticas": _estatisticas(jogo),
         },
     )
+
+
+@router.post("/carreira/salvar")
+def salvar_carreira_de_novo():
+    """Tenta gravar de novo o retrato que ficou pendente por save travado
+    (E-015). Sem jogo → 404; sem pendente → só volta para `/carreira`, sem
+    gravar. Com pendente, chama `salvar_jogo_em_andamento` com ele: se der
+    certo o aviso some; se falhar de novo continua pendente e o aviso fica.
+    """
+    jogo = obter_jogo()
+    if jogo is None:
+        raise HTTPException(status_code=404, detail=_SEM_CARREIRA)
+    if jogo.save_pendente is not None:
+        salvar_jogo_em_andamento(jogo, *jogo.save_pendente)
+    return RedirectResponse(url="/carreira", status_code=303)

@@ -12,8 +12,10 @@ from pathlib import Path
 from fastapi.templating import Jinja2Templates
 
 import catalogo
+import persistencia
 
 from web.escudo import escudo_svg
+from web.estado import obter_jogo
 
 BASE = Path(__file__).parent
 
@@ -25,3 +27,16 @@ templates.env.globals["escudo"] = escudo_svg
 # `{{ nome_time(time) }}` nos templates: resolve o nome de exibição a partir
 # do id (histórico), de uma `Equipe` ou de uma string.
 templates.env.globals["nome_time"] = catalogo.nome_para_exibir
+
+
+def save_pendente() -> bool:
+    """True se há jogo em andamento com um retrato que não foi gravado
+    porque o save estava travado (E-015). Lido a cada render, então o aviso
+    some assim que uma gravação der certo."""
+    jogo = obter_jogo()
+    return jogo is not None and jogo.save_pendente is not None
+
+
+# Aviso de save travado no topo de todas as páginas (`base.html`, E-015).
+templates.env.globals["save_pendente"] = save_pendente
+templates.env.globals["mensagem_save_travado"] = persistencia.MENSAGEM_SAVE_TRAVADO

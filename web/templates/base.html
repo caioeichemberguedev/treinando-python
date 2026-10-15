@@ -16,6 +16,16 @@
         </nav>
     </header>
 
+    {% if save_pendente() %}
+    <section class="aviso-save-travado" role="alert">
+        <p>{{ mensagem_save_travado }}</p>
+        <p>Seu progresso continua na memória do servidor — não feche o servidor antes de salvar.</p>
+        <form method="post" action="{{ url_for('salvar_carreira_de_novo') }}">
+            <button type="submit">Tentar salvar de novo</button>
+        </form>
+    </section>
+    {% endif %}
+
     <main>
         {% block conteudo %}{% endblock %}
     </main>

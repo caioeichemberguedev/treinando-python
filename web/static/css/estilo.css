@@ -4,6 +4,7 @@
     --cor-primaria: #2e7d32;
     --cor-primaria-clara: #4caf50;
     --cor-destaque: #ffb300;
+    --cor-erro: #e57373;
     --cor-borda: #2a3a2c;
     --espacamento: 1rem;
 }
@@ -119,4 +120,21 @@ th, td {
 
 .tabela-rolavel {
     overflow-x: auto;
+}
+
+/* Aviso de save travado no topo de todas as páginas (E-015) */
+.aviso-save-travado {
+    border: 2px solid var(--cor-erro);
+    border-left-width: 6px;
+    margin: var(--espacamento);
+    padding: 0.5rem var(--espacamento);
+    color: var(--cor-erro);
+}
+
+.aviso-save-travado p {
+    margin: 0.25rem 0;
+}
+
+.aviso-save-travado form {
+    margin: 0.5rem 0 0;
 }
