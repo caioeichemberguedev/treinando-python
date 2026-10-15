@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block titulo %}Carreira — Jogo de Futebol{% endblock %}
+
+{% block conteudo %}
+    <h1>Carreira</h1>
+    <p>{{ campeonato }} — Temporada {{ temporada }}</p>
+    <p class="destaque"><span class="time">{{ escudo(time_escolhido, 48) }}{{ nome_time(time_escolhido) }}</span></p>
+    {% if nome_save %}
+        <p>Carreira: <strong>{{ nome_save }}</strong> — salva automaticamente a cada fase.</p>
+    {% endif %}
+
+    <section class="painel">
+        <h2>Próximo jogo</h2>
+        {% if proximo_jogo.situacao == "encerrada" %}
+            <p>Temporada {{ temporada }} encerrada.</p>
+            <p>Campeão: <span class="time">{{ escudo(proximo_jogo.campeao, 20) }}{{ nome_time(proximo_jogo.campeao) }}</span></p>
+            {% if proximo_jogo.jogador_foi_campeao %}
+                <p>Você foi campeão!</p>
+            {% endif %}
+        {% elif proximo_jogo.situacao == "jogo" %}
+            <p>{{ proximo_jogo.nome_fase }}:
+                <span class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</span>
+                x
+                <span class="time">{{ escudo(proximo_jogo.adversario, 20) }}{{ nome_time(proximo_jogo.adversario) }}</span>
+            </p>
+        {% elif proximo_jogo.situacao == "bye" %}
+            <p>{{ proximo_jogo.nome_fase }}: seu time avança direto.</p>
+        {% else %}
+            {% if proximo_jogo.fase_eliminacao %}
+                <p>Eliminado na {{ proximo_jogo.fase_eliminacao }}.</p>
+            {% else %}
+                <p>Eliminado nesta temporada.</p>
+            {% endif %}
+            <p>A temporada segue sem o seu time.</p>
+        {% endif %}
+    </section>
+
+    <section class="painel">
+        <h2>Ficha do time</h2>
+        <table>
+            <tbody>
+                <tr><th>Finanças</th><td>R$ {{ "{:,}".format(time_escolhido.financas) }}</td></tr>
+                <tr><th>Torcedores</th><td>{{ "{:,}".format(time_escolhido.fas) }}</td></tr>
+                <tr><th>Força</th><td>{{ time_escolhido.forca }}/100</td></tr>
+                <tr><th>Títulos</th><td>{{ time_escolhido.titulos }}</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <div class="acoes">
+        {% if proximo_jogo.situacao == "encerrada" %}
+            <form method="post" action="{{ url_for('continuar_para_proxima_temporada') }}">
+                <button type="submit" class="botao">Ir para a temporada {{ temporada + 1 }}</button>
+            </form>
+        {% else %}
+            <a class="botao" href="{{ url_for('tela_fase') }}">Jogar próxima fase</a>
+        {% endif %}
+        <a class="botao" href="{{ url_for('inicio') }}">Voltar ao menu</a>
+    </div>
+{% endblock %}

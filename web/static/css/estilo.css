@@ -92,3 +92,20 @@ th, td {
 .time .escudo {
     margin-right: 0;
 }
+
+/* Dashboard da carreira (E-019) */
+.painel {
+    margin: var(--espacamento) 0;
+}
+
+.acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espacamento);
+    align-items: center;
+    margin: var(--espacamento) 0;
+}
+
+.acoes form {
+    margin: 0;
+}
