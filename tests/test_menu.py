@@ -120,6 +120,168 @@ def test_rodar_temporada_grava_historico_com_ids(monkeypatch):
     assert temporada_info["fases"][-1]["confrontos"][0][:2] == [901, 902]
 
 
+def _rodar_com_espiao(monkeypatch, *args):
+    """Roda `menu.rodar_temporada(*args)` com `salvar_jogo` trocado por um
+    espião (`*args`, como no teste acima) e o `input` sempre "1". Devolve
+    as chamadas de gravação e os históricos vistos no fim da temporada.
+    """
+    chamadas = []
+    historicos = []
+
+    def fim_de_temporada(campeonato, temporada, campeao, historico):
+        historicos.append(historico)
+        return False
+
+    monkeypatch.setattr(menu, "salvar_jogo", lambda *a: chamadas.append(a))
+    monkeypatch.setattr(menu, "menu_pos_temporada", fim_de_temporada)
+    monkeypatch.setattr(menu.os, "system", lambda comando: 0)
+    monkeypatch.setattr("builtins.input", lambda _mensagem="": "1")
+    menu.rodar_temporada(*args)
+    return chamadas, historicos
+
+
+def _quatro_times():
+    return [Equipe(f"Time {letra}", id=900 + n) for n, letra in enumerate("ABCD", start=1)]
+
+
+def test_rodar_temporada_grava_as_fases_no_meio_e_nao_no_fim(monkeypatch):
+    """E-014: a gravação depois da semifinal leva as fases (7º argumento,
+    posicional); a do campeão coroado `(temporada+1, None)` vai sem fases.
+    """
+    times = _quatro_times()
+    chamadas, historicos = _rodar_com_espiao(
+        monkeypatch, "1_01_01_2026", "Campeonato Teste", times[0], 2026, list(times), times
+    )
+
+    meio, fim = chamadas
+    assert len(meio[4]) == 2
+    assert [len(fase["confrontos"]) for fase in meio[6]] == [2]
+    assert fim[3] == 2027 and fim[4] is None
+    assert len(fim) == 6  # sem fases_da_temporada
+    fases = historicos[0][-1]["fases"]
+    assert [len(fase["confrontos"]) for fase in fases] == [2, 1]
+    assert fases[0] == meio[6][0]
+
+
+def test_rodar_temporada_soma_as_fases_carregadas(monkeypatch):
+    """Retomada no meio: as fases recebidas vêm antes das jogadas agora, e
+    a lista do chamador não é alterada.
+    """
+    times = _quatro_times()
+    semi = {
+        "nome_fase": "Semifinal - Campeonato Teste",
+        "confrontos": [[901, 902, 901, 1, 0], [903, 904, 903, 2, 1]],
+    }
+    recebidas = [semi]
+    chamadas, historicos = _rodar_com_espiao(
+        monkeypatch, "1_01_01_2026", "Campeonato Teste", times[0], 2026, [times[0], times[2]], times, [], recebidas
+    )
+
+    fases = historicos[0][-1]["fases"]
+    assert [len(fase["confrontos"]) for fase in fases] == [2, 1]
+    assert fases[0] == semi
+    assert recebidas == [semi]
+    assert chamadas[-1][4] is None and len(chamadas[-1]) == 6
+
+
+def test_rodar_temporada_sorteada_ignora_fases_recebidas(monkeypatch):
+    """Com `classificados=None` a temporada é sorteada agora: começa sem
+    fases, mesmo que alguma venha por engano.
+    """
+    times = _quatro_times()
+    lixo = [{"nome_fase": "Final - X", "confrontos": [[901, 902, 901, 1, 0]]}]
+    chamadas, historicos = _rodar_com_espiao(
+        monkeypatch, "1_01_01_2026", "Campeonato Teste", times[0], 2026, None, times, [], lixo
+    )
+
+    assert len(chamadas[0]) == 6  # gravação do sorteio, sem fases
+    assert [len(fase["confrontos"]) for fase in historicos[0][-1]["fases"]] == [2, 1]
+
+
+def test_carregar_jogo_repassa_as_fases_do_save(monkeypatch):
+    times = _quatro_times()
+    fases = [{"nome_fase": "Semifinal - Campeonato Teste", "confrontos": [[901, 902, 901, 1, 0]]}]
+    dados = {
+        "campeonato": "Campeonato Teste",
+        "time_escolhido": times[0],
+        "temporada": 2026,
+        "classificados": [times[0], times[2]],
+        "historico": [],
+        "fases_da_temporada": fases,
+    }
+    chamadas = []
+    monkeypatch.setattr(menu, "escolher_save", lambda acao: "1_01_01_2026")
+    monkeypatch.setattr(menu, "carregar_jogo_salvo", lambda nome: dados)
+    monkeypatch.setattr(menu, "rodar_temporada", lambda *args: chamadas.append(args))
+
+    menu.carregar_jogo({"Campeonato Teste": times})
+
+    assert len(chamadas) == 1
+    assert chamadas[0][0] == "1_01_01_2026"
+    assert chamadas[0][7] is fases
+
+
+def test_carregar_jogo_save_sem_chave_de_fases_repassa_lista_vazia(monkeypatch):
+    """Borda: dict de save sem `fases_da_temporada` (formato antigo) não quebra."""
+    times = _quatro_times()
+    dados = {
+        "campeonato": "Campeonato Teste",
+        "time_escolhido": times[0],
+        "temporada": 2026,
+        "classificados": [times[0], times[2]],
+        "historico": [],
+    }
+    chamadas = []
+    monkeypatch.setattr(menu, "escolher_save", lambda acao: "1_01_01_2026")
+    monkeypatch.setattr(menu, "carregar_jogo_salvo", lambda nome: dados)
+    monkeypatch.setattr(menu, "rodar_temporada", lambda *args: chamadas.append(args))
+
+    menu.carregar_jogo({"Campeonato Teste": times})
+
+    assert chamadas[0][7] == []
+
+
+def test_save_travado_no_meio_repete_a_gravacao_com_as_fases(monkeypatch):
+    """Borda: save travado na gravação do meio → a nova tentativa leva as
+    mesmas fases (E-015-T1 + E-014-T4)."""
+    times = _quatro_times()
+    chamadas = []
+    falhas = [1]
+
+    def salvar_travando_uma_vez(*args):
+        chamadas.append(args)
+        if len(args) == 7 and falhas[0] > 0:
+            falhas[0] -= 1
+            raise menu.SaveTravado("travado")
+
+    monkeypatch.setattr(menu, "salvar_jogo", salvar_travando_uma_vez)
+    monkeypatch.setattr(menu, "menu_pos_temporada", lambda *a: False)
+    monkeypatch.setattr(menu.os, "system", lambda comando: 0)
+    monkeypatch.setattr("builtins.input", lambda _mensagem="": "1")
+
+    menu.rodar_temporada("1_01_01_2026", "Campeonato Teste", times[0], 2026, list(times), times)
+
+    meio = [c for c in chamadas if len(c) == 7]
+    assert len(meio) == 2
+    assert meio[0][6] == meio[1][6]
+    assert [len(f["confrontos"]) for f in meio[1][6]] == [2]
+
+
+def test_rodar_temporada_com_bye_registra_todas_as_fases(monkeypatch):
+    """Borda: total ímpar (3 times, um bye) — gravação do meio leva a 1ª
+    fase e o histórico termina com todas as fases jogadas."""
+    times = _quatro_times()[:3]
+    chamadas, historicos = _rodar_com_espiao(
+        monkeypatch, "1_01_01_2026", "Campeonato Teste", times[0], 2026, list(times), times
+    )
+
+    meio = [c for c in chamadas if len(c) == 7]
+    fases = historicos[0][-1]["fases"]
+    assert len(fases) == len(meio) + 1
+    assert meio[-1][6] == fases[:-1]
+    assert chamadas[-1][4] is None and len(chamadas[-1]) == 6
+
+
 @pytest.fixture
 def historico_em_ids():
     """Uma temporada com semifinais e final entre os ids 1-4 do catálogo

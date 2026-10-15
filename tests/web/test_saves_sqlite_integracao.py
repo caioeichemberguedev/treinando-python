@@ -124,6 +124,6 @@ def test_terminal_continua_carreira_salva_e_conclui_temporada(monkeypatch):
     assert dados["classificados"] is None
     assert len(dados["historico"]) == 1
     nomes_fases = [fase["nome_fase"] for fase in dados["historico"][0]["fases"]]
-    assert len(nomes_fases) == 3  # quartas, semi, final (as oitavas foram antes do "sair")
+    assert len(nomes_fases) == 4  # E-014: as oitavas, jogadas antes do "sair", vêm do save
     assert persistencia.excluir_jogo_salvo(nome) is True
     assert not os.path.exists(persistencia._caminho_save(nome))

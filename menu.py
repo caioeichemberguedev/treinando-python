@@ -187,10 +187,19 @@ def _salvar_com_retentativa(*args) -> bool:
                 return False
 
 
-def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classificados, times, historico=None):
+def rodar_temporada(
+    nome_save, campeonato, time_escolhido, temporada, classificados, times, historico=None, fases_da_temporada=None
+):
+    """Joga a temporada fase a fase, gravando o retrato da carreira a cada
+    fase fechada. `fases_da_temporada` = fases já jogadas desta temporada
+    antes de carregar o save (mesmo formato de `historico[i]["fases"]`,
+    E-014); as fases jogadas agora são somadas a elas.
+    """
     historico = historico or []
+    fases_da_temporada = list(fases_da_temporada or [])
 
     if classificados is None:
+        fases_da_temporada = []  # temporada recém-sorteada não tem fases jogadas
         if len(times) < 2:
             print(COR_TXT.ERRO, "Esse campeonato não tem equipes suficientes para a nova temporada.", COR_TXT.NORMAL)
             return
@@ -202,8 +211,6 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
     print("Campeonato:", campeonato)
     print("Temporada:", temporada)
     print("Seu time:", time_escolhido)
-
-    fases_da_temporada = []
 
     for nome_fase, confrontos, proximos in gerar_rodadas(classificados, time_escolhido, campeonato):
         exibir_rodada(nome_fase, confrontos)
@@ -221,7 +228,7 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
             historico = historico + [{
                 "temporada": temporada,
                 "campeao": campeao.id,
-                "fases": fases_da_temporada,
+                "fases": list(fases_da_temporada),
             }]
 
             proxima_temporada = temporada + 1
@@ -232,7 +239,9 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
                 rodar_temporada(nome_save, campeonato, time_escolhido, proxima_temporada, None, times, historico)
             return
 
-        if not _salvar_com_retentativa(nome_save, campeonato, time_escolhido, temporada, proximos, historico):
+        if not _salvar_com_retentativa(
+            nome_save, campeonato, time_escolhido, temporada, proximos, historico, list(fases_da_temporada)
+        ):
             return
 
         escolha = input("\nENTER para a próxima fase, ou digite 'sair' para voltar ao menu: ").strip().lower()
@@ -271,7 +280,14 @@ def carregar_jogo(equipes):
     times = unificar_time_escolhido(dados["time_escolhido"], equipes.get(campeonato, []))
     historico = dados.get("historico", [])
     rodar_temporada(
-        nome_save, campeonato, dados["time_escolhido"], dados["temporada"], dados["classificados"], times, historico
+        nome_save,
+        campeonato,
+        dados["time_escolhido"],
+        dados["temporada"],
+        dados["classificados"],
+        times,
+        historico,
+        dados.get("fases_da_temporada", []),
     )
 
 

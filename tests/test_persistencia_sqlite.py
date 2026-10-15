@@ -42,17 +42,20 @@ def _ids(equipes):
 def _espionar_salvar_jogo(monkeypatch):
     """Envolve o `salvar_jogo` real usado pelo menu e guarda os argumentos
     de cada chamada (os classificados como lista de ids, no momento da
-    chamada).
+    chamada, e as fases da temporada em andamento, E-014).
     """
     chamadas = []
     salvar_real = persistencia.salvar_jogo
 
-    def salvar_e_registrar(nome_save, campeonato, time_escolhido, temporada, classificados, historico=None):
+    def salvar_e_registrar(
+        nome_save, campeonato, time_escolhido, temporada, classificados, historico=None, fases_da_temporada=None
+    ):
         chamadas.append({
             "temporada": temporada,
             "classificados": None if classificados is None else _ids(classificados),
+            "fases_da_temporada": list(fases_da_temporada or []),
         })
-        salvar_real(nome_save, campeonato, time_escolhido, temporada, classificados, historico)
+        salvar_real(nome_save, campeonato, time_escolhido, temporada, classificados, historico, fases_da_temporada)
 
     monkeypatch.setattr(menu, "salvar_jogo", salvar_e_registrar)
     return chamadas
@@ -131,6 +134,93 @@ def test_sair_no_meio_e_carregar_devolve_os_mesmos_classificados_na_ordem(monkey
 
     # Carregar de novo devolve a mesma coisa (nada foi regravado).
     assert _ids(persistencia.carregar_jogo_salvo(nome)["classificados"]) == depois_das_oitavas
+
+
+def _teclado_que_sai(monkeypatch, saidas):
+    """`input` que responde 'sair' nas `saidas` primeiras perguntas de
+    "próxima fase" e "1" em todo o resto (pênaltis, menus).
+    """
+    restantes = [saidas]
+
+    def responder(mensagem=""):
+        if "sair" in mensagem and restantes[0] > 0:
+            restantes[0] -= 1
+            return "sair"
+        return "1"
+
+    monkeypatch.setattr("builtins.input", responder)
+
+
+def _terminar_carregando(monkeypatch, nome, times, vezes=1):
+    """Carrega a carreira pelo menu `vezes` vezes e devolve os históricos
+    vistos no fim da temporada (o jogo para ali, sem seguir para a próxima).
+    """
+    historicos = []
+
+    def fim_de_temporada(campeonato, temporada, campeao, historico):
+        historicos.append(historico)
+        return False
+
+    monkeypatch.setattr(menu, "menu_pos_temporada", fim_de_temporada)
+    monkeypatch.setattr(menu, "escolher_save", lambda acao: nome)
+    for _ in range(vezes):
+        menu.carregar_jogo({CAMPEONATO: times})
+    return historicos
+
+
+def test_save_no_meio_guarda_as_fases_ja_jogadas(monkeypatch, times):
+    """E-014: cada gravação no meio da temporada leva as fases já fechadas."""
+    chamadas = _espionar_salvar_jogo(monkeypatch)
+    _teclado_que_sai(monkeypatch, 1)
+    nome = persistencia.gerar_nome_save()
+
+    menu.rodar_temporada(nome, CAMPEONATO, times[3], 2026, None, times)
+
+    assert [len(c["fases_da_temporada"]) for c in chamadas] == [0, 1]
+    dados = persistencia.carregar_jogo_salvo(nome)
+    assert [len(f["confrontos"]) for f in dados["fases_da_temporada"]] == [8]
+    assert dados["fases_da_temporada"] == chamadas[-1]["fases_da_temporada"]
+
+
+def test_sair_depois_das_oitavas_carregar_e_terminar_fecha_com_4_fases(monkeypatch, times):
+    """Critério do E-014: sair depois das oitavas, carregar e terminar →
+    histórico da temporada com 8, 4, 2 e 1 confrontos."""
+    _teclado_que_sai(monkeypatch, 1)
+    nome = persistencia.gerar_nome_save()
+    menu.rodar_temporada(nome, CAMPEONATO, times[3], 2026, None, times)
+    oitavas = persistencia.carregar_jogo_salvo(nome)["fases_da_temporada"]
+
+    historicos = _terminar_carregando(monkeypatch, nome, times)
+
+    assert len(historicos) == 1
+    fases = historicos[0][-1]["fases"]
+    assert [len(fase["confrontos"]) for fase in fases] == [8, 4, 2, 1]
+    assert fases[0] == oitavas[0]
+    dados = persistencia.carregar_jogo_salvo(nome)
+    assert dados["temporada"] == 2027
+    assert dados["classificados"] is None
+    assert dados["fases_da_temporada"] == []
+    temporada = dados["historico"][-1]
+    assert [len(fase["confrontos"]) for fase in temporada["fases"]] == [8, 4, 2, 1]
+    assert temporada["campeao"] == temporada["fases"][-1]["confrontos"][0][2]
+
+
+def test_sair_duas_vezes_tambem_fecha_com_4_fases(monkeypatch, times):
+    """Sai depois das oitavas, carrega, sai depois das quartas, carrega e
+    termina: a temporada continua com as 4 fases."""
+    _teclado_que_sai(monkeypatch, 2)
+    nome = persistencia.gerar_nome_save()
+    menu.rodar_temporada(nome, CAMPEONATO, times[3], 2026, None, times)
+    assert len(persistencia.carregar_jogo_salvo(nome)["fases_da_temporada"]) == 1
+
+    historicos = _terminar_carregando(monkeypatch, nome, times, vezes=2)
+
+    assert len(historicos) == 1
+    dados = persistencia.carregar_jogo_salvo(nome)
+    temporada = dados["historico"][-1]
+    assert [len(fase["confrontos"]) for fase in temporada["fases"]] == [8, 4, 2, 1]
+    assert temporada["campeao"] == temporada["fases"][-1]["confrontos"][0][2]
+    assert dados["fases_da_temporada"] == []
 
 
 def test_carregar_entre_temporadas_soma_o_titulo_no_time_do_jogador(monkeypatch, times):
