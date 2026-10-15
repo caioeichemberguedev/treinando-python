@@ -133,6 +133,93 @@ def test_sair_no_meio_e_carregar_devolve_os_mesmos_classificados_na_ordem(monkey
     assert _ids(persistencia.carregar_jogo_salvo(nome)["classificados"]) == depois_das_oitavas
 
 
+def test_carregar_entre_temporadas_soma_o_titulo_no_time_do_jogador(monkeypatch, times):
+    """B-020: carreira salva entre temporadas com o jogador já bicampeão.
+    Ao carregar pelo terminal, o sorteio usa o `time_escolhido` carregado
+    (e não o objeto do elenco base), então um título novo soma nos 2 da
+    carreira e vai para o save — sem depender de quem vence."""
+    nome = persistencia.gerar_nome_save()
+    escolhido = persistencia.carregar_equipes()[CAMPEONATO][0]
+    escolhido.titulos = 2
+    persistencia.salvar_jogo(nome, CAMPEONATO, escolhido, 2027, None, [])
+    monkeypatch.setattr("builtins.input", lambda mensagem="": "1")
+    campeoes = []
+
+    def fim_de_temporada(campeonato, temporada, campeao, historico):
+        campeoes.append(historico[-1]["campeao"])
+        return False
+
+    monkeypatch.setattr(menu, "menu_pos_temporada", fim_de_temporada)
+
+    menu.carregar_jogo({CAMPEONATO: times})
+
+    assert len(campeoes) == 1
+    dados = persistencia.carregar_jogo_salvo(nome)
+    assert dados["temporada"] == 2028
+    assert dados["time_escolhido"].id == escolhido.id
+    assert dados["time_escolhido"].titulos == 2 + (1 if campeoes[0] == escolhido.id else 0)
+
+
+def test_carregar_entre_temporadas_jogador_campeao_soma_o_titulo_deterministico(monkeypatch, times):
+    """B-020, versão determinística: os pênaltis são forçados para o
+    `time_a` vencer, e o jogador é sempre o `time_a` nos seus jogos
+    (interativo), então ele é campeão sempre. Sem a unificação, o título
+    cairia no objeto do elenco base e o save ficaria com 2."""
+    import campeonato
+
+    def penaltis_jogador_sempre_vence(time_a, time_b, interativo=False):
+        return time_a, 5, 4
+
+    monkeypatch.setattr(campeonato, "disputa_penaltis", penaltis_jogador_sempre_vence)
+    nome = persistencia.gerar_nome_save()
+    escolhido = persistencia.carregar_equipes()[CAMPEONATO][0]
+    escolhido.titulos = 2
+    persistencia.salvar_jogo(nome, CAMPEONATO, escolhido, 2027, None, [])
+    monkeypatch.setattr("builtins.input", lambda mensagem="": "1")
+    monkeypatch.setattr(menu, "menu_pos_temporada", lambda *args: False)
+
+    menu.carregar_jogo({CAMPEONATO: times})
+
+    dados = persistencia.carregar_jogo_salvo(nome)
+    assert dados["historico"][-1]["campeao"] == escolhido.id
+    assert dados["time_escolhido"].titulos == 3
+    # O elenco base recebido não foi alterado (unificar devolve lista nova).
+    assert next(t for t in times if t.id == escolhido.id).titulos == 0
+
+
+def test_carregar_entre_temporadas_sorteia_com_o_objeto_do_jogador(monkeypatch, times):
+    """B-020: o sorteio do terminal recebe o próprio `time_escolhido`
+    carregado (identidade), independente de quem vence."""
+    sorteios = []
+    sortear_real = menu.sortear_classificados
+
+    def sortear_e_espiar(lista):
+        sorteios.append(lista)
+        return sortear_real(lista)
+
+    escolhidos = []
+    rodadas_real = menu.gerar_rodadas
+
+    def rodadas_e_espiar(classificados, time_escolhido=None, campeonato=""):
+        escolhidos.append(time_escolhido)
+        return rodadas_real(classificados, time_escolhido, campeonato)
+
+    monkeypatch.setattr(menu, "sortear_classificados", sortear_e_espiar)
+    monkeypatch.setattr(menu, "gerar_rodadas", rodadas_e_espiar)
+    nome = persistencia.gerar_nome_save()
+    escolhido = persistencia.carregar_equipes()[CAMPEONATO][0]
+    escolhido.titulos = 2
+    persistencia.salvar_jogo(nome, CAMPEONATO, escolhido, 2027, None, [])
+    monkeypatch.setattr("builtins.input", lambda mensagem="": "1")
+    monkeypatch.setattr(menu, "menu_pos_temporada", lambda *args: False)
+
+    menu.carregar_jogo({CAMPEONATO: times})
+
+    assert len(sorteios) == 1 and len(escolhidos) == 1
+    assert escolhidos[0].titulos >= 2
+    assert any(time is escolhidos[0] for time in sorteios[0])
+
+
 # --- 4. Concorrência: duas conexões no mesmo .db ---------------------------
 
 

@@ -7,6 +7,7 @@ from campeonato import (
     montar_confrontos_fase,
     registro_da_fase,
     sortear_classificados,
+    unificar_time_escolhido,
 )
 from equipe import Equipe
 
@@ -328,3 +329,54 @@ def test_adversario_na_proxima_fase_bate_com_fluxo_web_jogador_no_fim_de_proximo
                         proximos = proximos + [random.choice(pendente)]
 
                 classificados = proximos
+
+
+def test_unificar_time_escolhido_troca_pelo_proprio_objeto_escolhido():
+    """O elemento de mesmo id vira o próprio `time_escolhido` (identidade,
+    não só igualdade), e os demais seguem os mesmos objetos."""
+    time_a, time_b, time_c = _times("A", "B", "C")
+    escolhido = Equipe("B (retrato da carreira)", id=2, titulos=2)
+
+    unificada = unificar_time_escolhido(escolhido, [time_a, time_b, time_c])
+
+    assert unificada[1] is escolhido
+    assert unificada[1] is not time_b
+    assert unificada[0] is time_a
+    assert unificada[2] is time_c
+
+
+def test_unificar_time_escolhido_mantem_a_ordem():
+    time_a, time_b, time_c, time_d = _times("A", "B", "C", "D")
+    escolhido = Equipe("C", id=3)
+
+    unificada = unificar_time_escolhido(escolhido, [time_d, time_c, time_b, time_a])
+
+    assert [time.id for time in unificada] == [4, 3, 2, 1]
+    assert unificada[1] is escolhido
+
+
+def test_unificar_time_escolhido_nao_altera_lista_recebida():
+    time_a, time_b = _times("A", "B")
+    times = [time_a, time_b]
+    escolhido = Equipe("A", id=1)
+
+    unificada = unificar_time_escolhido(escolhido, times)
+
+    assert unificada is not times
+    assert times[0] is time_a
+    assert times[1] is time_b
+
+
+def test_unificar_time_escolhido_com_none_devolve_none():
+    assert unificar_time_escolhido(Equipe("A", id=1), None) is None
+
+
+def test_unificar_time_escolhido_sem_o_time_devolve_copia_igual():
+    time_a, time_b = _times("A", "B")
+    times = [time_a, time_b]
+
+    unificada = unificar_time_escolhido(Equipe("Z", id=99), times)
+
+    assert unificada is not times
+    assert all(novo is antigo for novo, antigo in zip(unificada, times))
+    assert len(unificada) == 2

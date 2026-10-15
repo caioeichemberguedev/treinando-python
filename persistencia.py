@@ -15,6 +15,7 @@ import sqlite3
 from datetime import date
 
 import catalogo
+from campeonato import unificar_time_escolhido
 from dados.conexao import abrir
 from dados.migrar import migrar, versao_atual, versao_do_banco
 from dados.repositorios.carreira import gravar_carreira, ler_carreira
@@ -175,6 +176,12 @@ def carregar_jogo_salvo(nome_save):
     efetivo (edições do adm valem também para carreiras em andamento; nada
     é regravado).
 
+    Se o time do jogador está nos `classificados`, o `time_escolhido`
+    devolvido é o MESMO objeto do classificado
+    (`campeonato.unificar_time_escolhido`, B-020): vitórias e títulos da
+    temporada caem na ficha do jogador. Os demais times continuam objetos
+    próprios desta carreira.
+
     Devolve {"campeonato", "time_escolhido", "temporada", "classificados",
     "historico"}, ou None se o save não existir ou não for válido (o
     arquivo nunca é criado).
@@ -196,13 +203,16 @@ def carregar_jogo_salvo(nome_save):
     if carreira is None:
         return None
 
+    time_escolhido = _aplicar_catalogo(carreira["time_escolhido"])
     classificados = carreira["classificados"]
     if classificados is not None:
         classificados = [_aplicar_catalogo(equipe) for equipe in classificados]
+    # B-020: o time do jogador vira um objeto só (escolhido = classificado).
+    classificados = unificar_time_escolhido(time_escolhido, classificados)
 
     return {
         "campeonato": carreira["campeonato"],
-        "time_escolhido": _aplicar_catalogo(carreira["time_escolhido"]),
+        "time_escolhido": time_escolhido,
         "temporada": carreira["temporada"],
         "classificados": classificados,
         "historico": historico,

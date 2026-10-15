@@ -14,7 +14,7 @@ confirmação antes do POST que efetivamente remove, do mesmo jeito que
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from campeonato import sortear_classificados
+from campeonato import sortear_classificados, unificar_time_escolhido
 from persistencia import carregar_equipes, carregar_jogo_salvo, excluir_jogo_salvo, listar_saves
 from web.estado import iniciar_jogo, salvar_jogo_em_andamento
 from web.templates_config import templates
@@ -54,18 +54,22 @@ def carregar_save(nome_save: str):
 
     O roster completo do campeonato (`times`) é sempre recarregado aqui e
     guardado em `times_do_campeonato`, independente de `classificados` já vir
-    preenchido ou não — mas, como o save guarda `classificados` como objetos
-    `Equipe` reconstruídos à parte (via `Equipe.from_dict`), eles não
-    compartilham identidade com esse roster recém-carregado. É o mesmo split
-    de identidade que já existe hoje no terminal entre `dados["classificados"]`
-    e `equipes[campeonato]` em `menu.carregar_jogo` — não é uma regressão
-    nova: só para carreiras iniciadas direto na web (`/novo-jogo/time`) que a
-    progressão de fato persiste entre temporadas dentro da mesma sessão.
+    preenchido ou não. O time do jogador é um objeto só em todo lugar
+    (B-020): `carregar_jogo_salvo` já devolve o `time_escolhido` como o
+    mesmo objeto do classificado, e aqui o roster é unificado com ele
+    (`unificar_time_escolhido`) antes de sortear/guardar — então o sorteio
+    de agora e o de `/campeao/continuar` usam o `time_escolhido` com os
+    títulos da carreira. Os DEMAIS times do save continuam objetos
+    reconstruídos à parte (via `Equipe.from_dict`), sem identidade com o
+    roster recém-carregado — o mesmo split que existe no terminal em
+    `menu.carregar_jogo`; só para carreiras iniciadas direto na web
+    (`/novo-jogo/time`) a progressão dos adversários persiste entre
+    temporadas dentro da mesma sessão.
     """
     dados = _dados_do_save_existente(nome_save)
 
     campeonato = dados["campeonato"]
-    times = carregar_equipes().get(campeonato, [])
+    times = unificar_time_escolhido(dados["time_escolhido"], carregar_equipes().get(campeonato, []))
     classificados = dados["classificados"]
     sorteou = classificados is None
     if sorteou:

@@ -25,6 +25,23 @@ def sortear_classificados(times):
     return classificados
 
 
+def unificar_time_escolhido(time_escolhido, times):
+    """Devolve uma lista NOVA igual a `times`, mas com o elemento de mesmo
+    id do `time_escolhido` trocado pelo próprio objeto `time_escolhido`.
+
+    Assim o time do jogador vira um objeto só: vitórias e títulos somados
+    no chaveamento aparecem também na ficha (que lê `time_escolhido`). A
+    busca é por `==` (igualdade de `Equipe` pelo id); a troca garante
+    identidade (`is`). Não altera a lista recebida e mantém a ordem.
+
+    `times=None` (temporada ainda não sorteada) → `None`; sem o time na
+    lista → cópia igual.
+    """
+    if times is None:
+        return None
+    return [time_escolhido if time == time_escolhido else time for time in times]
+
+
 def gerar_rodadas(classificados, time_escolhido=None, campeonato=""):
     """Gera as rodadas eliminatórias uma a uma (lazy), até sobrar um campeão.
 

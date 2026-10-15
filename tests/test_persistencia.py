@@ -178,9 +178,8 @@ def test_salvar_e_carregar_devolve_o_mesmo_retrato(dir_saves):
     time_b, time_a = dados["classificados"]
     assert (time_b.nome, time_b.financas, time_b.fas, time_b.forca, time_b.cores) == ("Time B", 5, 6, 40, None)
     assert (time_a.financas, time_a.fas) == (99, 88)
-    # Escolhido e classificado: iguais por id, objetos separados.
-    assert dados["time_escolhido"] == time_a
-    assert dados["time_escolhido"] is not time_a
+    # Escolhido e classificado: o mesmo objeto (B-020).
+    assert dados["time_escolhido"] is time_a
 
 
 def test_salvar_jogo_de_novo_substitui_o_retrato(dir_saves):
@@ -363,3 +362,32 @@ def test_carregar_jogo_salvo_com_classificados_none(dir_saves):
 
     assert dados["time_escolhido"].nome == "SPFC"
     assert dados["classificados"] is None
+
+
+def test_carregar_com_jogador_eliminado_nao_poe_ele_nos_classificados(dir_saves):
+    """B-020 (borda): jogador já eliminado no meio da temporada — o
+    `time_escolhido` volta sozinho e os classificados seguem sem ele."""
+    escolhido = Equipe("Time A", titulos=2, id=901)
+    restantes = [Equipe("Time B", id=902), Equipe("Time C", id=903)]
+    persistencia.salvar_jogo(NOME, "Campeonato Teste", escolhido, 2026, restantes)
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+
+    assert dados["time_escolhido"].titulos == 2
+    assert [time.id for time in dados["classificados"]] == [902, 903]
+    assert all(time is not dados["time_escolhido"] for time in dados["classificados"])
+
+
+def test_carregar_unificado_aplica_catalogo_no_objeto_unico(dir_saves):
+    """B-020 (borda): o objeto único do jogador já vem com o nome do adm."""
+    persistencia.salvar_jogo(
+        NOME, "Copa do Brasil", Equipe("São Paulo", id=1, titulos=3), 2026,
+        [Equipe("Palmeiras", id=2), Equipe("São Paulo", id=1, titulos=3)],
+    )
+    _renomear_sao_paulo()
+
+    dados = persistencia.carregar_jogo_salvo(NOME)
+
+    assert dados["classificados"][1] is dados["time_escolhido"]
+    assert dados["time_escolhido"].nome == "SPFC"
+    assert dados["time_escolhido"].titulos == 3

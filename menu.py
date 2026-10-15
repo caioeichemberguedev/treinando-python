@@ -8,6 +8,7 @@ from campeonato import (
     montar_classificacao,
     registro_da_fase,
     sortear_classificados,
+    unificar_time_escolhido,
 )
 from persistencia import (
     carregar_equipes,
@@ -240,7 +241,9 @@ def carregar_jogo(equipes):
 
     dados = carregar_jogo_salvo(nome_save)
     campeonato = dados["campeonato"]
-    times = equipes.get(campeonato, [])
+    # B-020: no elenco base, o time do jogador é o `time_escolhido` carregado
+    # (com os títulos da carreira) — vale para o sorteio de agora e dos próximos.
+    times = unificar_time_escolhido(dados["time_escolhido"], equipes.get(campeonato, []))
     historico = dados.get("historico", [])
     rodar_temporada(
         nome_save, campeonato, dados["time_escolhido"], dados["temporada"], dados["classificados"], times, historico

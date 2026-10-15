@@ -296,3 +296,63 @@ def test_tela_saves_nao_mostra_progresso_salvo(url):
     assert resposta.status_code == 200
     assert "Progresso salvo!" not in resposta.text
     assert "1_01_01_2026" in resposta.text
+
+
+# --- B-020: o time do jogador é um objeto só depois de carregar ---
+
+
+def _jogar_ate_o_campeao(jogo):
+    """Joga (pênaltis no canto 1) e segue até a temporada ter campeão."""
+    while jogo.campeao is None:
+        resposta = client.get("/fase", follow_redirects=False)
+        if resposta.status_code == 303 and resposta.headers["location"] == "/fase/penaltis":
+            client.get("/fase/penaltis")
+            while True:
+                cobranca = client.post("/fase/penaltis", data={"canto": "1"}, follow_redirects=False)
+                assert cobranca.status_code == 303
+                if cobranca.headers["location"] == "/fase":
+                    break
+        seguir = client.post("/fase/seguir", follow_redirects=False)
+        assert seguir.status_code == 303
+
+
+def _esta_na_lista(objeto, lista):
+    return any(item is objeto for item in lista)
+
+
+def test_carregar_no_meio_da_temporada_ficha_soma_o_titulo_do_jogador():
+    bicampeao = Equipe("Time A", id=901, titulos=2)
+    _criar_save("1_01_01_2026", time_escolhido=bicampeao, classificados=[bicampeao, Equipe("Time B", id=902)])
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+    jogo = estado.obter_jogo()
+
+    assert _esta_na_lista(jogo.time_escolhido, jogo.classificados)
+
+    _jogar_ate_o_campeao(jogo)
+    esperado = 2 + (1 if jogo.campeao.id == 901 else 0)
+
+    html = client.get("/carreira").text
+    assert f"<th>Títulos</th><td>{esperado}</td>" in html
+
+
+def test_carregar_entre_temporadas_sorteia_com_o_proprio_time_escolhido():
+    _criar_save("1_01_01_2026", time_escolhido=Equipe("Time A", id=901, titulos=2), classificados=None)
+
+    client.post("/saves/1_01_01_2026/carregar", follow_redirects=False)
+    jogo = estado.obter_jogo()
+
+    assert jogo.time_escolhido.titulos == 2
+    assert _esta_na_lista(jogo.time_escolhido, jogo.classificados)
+    assert _esta_na_lista(jogo.time_escolhido, jogo.times_do_campeonato)
+
+    _jogar_ate_o_campeao(jogo)
+    esperado = 2 + (1 if jogo.campeao.id == 901 else 0)
+    assert jogo.time_escolhido.titulos == esperado
+
+    resposta = client.post("/campeao/continuar", follow_redirects=False)
+
+    assert resposta.status_code == 303
+    assert _esta_na_lista(jogo.time_escolhido, jogo.classificados)
+    assert _esta_na_lista(jogo.time_escolhido, jogo.times_do_campeonato)
+    assert f"<th>Títulos</th><td>{esperado}</td>" in client.get("/carreira").text
