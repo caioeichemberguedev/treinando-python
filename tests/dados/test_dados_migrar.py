@@ -143,6 +143,51 @@ def test_banco_mais_novo_que_o_jogo_da_value_error(banco, pasta_migracoes):
     assert _tabelas(banco) == []
 
 
+@pytest.fixture(params=[("001_a.sql", "01_b.sql"), ("001_a.sql", "001_b.sql")])
+def pasta_repetida(request, tmp_path):
+    """Pasta com dois arquivos de mesmo número (M-016) e uma 002 válida."""
+    pasta = tmp_path / "repetida"
+    pasta.mkdir()
+    for nome in request.param:
+        (pasta / nome).write_text(
+            f"CREATE TABLE t_{nome[:-4].replace('_', '')} (id INTEGER);",
+            encoding="utf-8",
+        )
+    (pasta / "002_c.sql").write_text("CREATE TABLE c (id INTEGER);", encoding="utf-8")
+    return pasta, request.param
+
+
+def test_numero_repetido_da_value_error_em_versao_atual(pasta_repetida):
+    pasta, (nome_1, nome_2) = pasta_repetida
+    with pytest.raises(ValueError, match="repetido") as erro:
+        versao_atual(pasta)
+    mensagem = str(erro.value)
+    assert "(1)" in mensagem
+    assert f"{nome_1}, {nome_2}" in mensagem  # ordem alfabética
+
+
+def test_numero_repetido_em_migrar_nao_toca_o_banco(banco, pasta_repetida):
+    pasta, (nome_1, nome_2) = pasta_repetida
+    with pytest.raises(ValueError) as erro:
+        migrar(banco, pasta)
+    assert nome_1 in str(erro.value)
+    assert nome_2 in str(erro.value)
+    assert versao_do_banco(banco) == 0
+    assert _tabelas(banco) == []
+    assert not banco.in_transaction
+
+
+def test_mensagem_de_repetido_e_estavel_em_ordem_alfabetica(tmp_path):
+    pasta = tmp_path / "ordem"
+    pasta.mkdir()
+    # Criados fora de ordem: a mensagem não depende do iterdir().
+    for nome in ("003_z.sql", "3_b.sql", "003_a.sql"):
+        (pasta / nome).write_text("SELECT 1;", encoding="utf-8")
+    with pytest.raises(ValueError) as erro:
+        versao_atual(pasta)
+    assert "(3): 003_a.sql, 003_z.sql, 3_b.sql." in str(erro.value)
+
+
 def test_fixture_conn_esta_migrada_ate_a_versao_atual(conn):
     assert versao_do_banco(conn) == versao_atual()
     assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
@@ -156,3 +201,18 @@ def test_migrar_real_do_zero_cria_as_seis_tabelas_da_001(banco):
     assert _tabelas(banco) == [
         "carreira", "classificados", "confrontos", "fases", "temporadas", "times",
     ]
+
+
+def test_repetido_so_conta_arquivos_validos(tmp_path):
+    """Pasta e arquivo fora do padrão com o mesmo número não contam (M-016)."""
+    pasta = tmp_path / "quase_repetida"
+    pasta.mkdir()
+    (pasta / "001_a.sql").write_text("CREATE TABLE a (id INTEGER);", encoding="utf-8")
+    (pasta / "001_pasta.sql").mkdir()
+    (pasta / "001_b.sql.bak").write_text("SELECT 1;", encoding="utf-8")
+    (pasta / "001-c.sql").write_text("SELECT 1;", encoding="utf-8")
+    assert versao_atual(pasta) == 1
+
+
+def test_pasta_real_de_migracoes_nao_tem_numero_repetido():
+    assert versao_atual() >= 1

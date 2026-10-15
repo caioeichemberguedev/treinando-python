@@ -4,7 +4,8 @@ A versão do banco fica em `PRAGMA user_version`. `migrar()` aplica, em
 ordem numérica, as migrações com número maior que essa versão, uma por
 transação. Os arquivos `.sql` não têm `BEGIN`/`COMMIT`/`PRAGMA
 user_version` — isso é trabalho daqui. Migração já aplicada nunca é
-editada: errou, crie outra.
+editada: errou, crie outra. Dois arquivos com o mesmo número na pasta
+→ `ValueError` antes de rodar qualquer SQL (`versao_atual()` e `migrar()`).
 """
 
 import re
@@ -20,17 +21,31 @@ _PADRAO_ARQUIVO = re.compile(r"^(\d+)_\w+\.sql$")
 def _listar_migracoes(pasta: Path | str) -> list[tuple[int, Path]]:
     """Devolve `(numero, caminho)` das migrações da pasta, em ordem
     numérica. Pasta inexistente = nenhuma migração.
+
+    Dois arquivos com o mesmo número (`001_a.sql` e `01_b.sql`, ou
+    `001_a.sql` e `001_b.sql`) → `ValueError` citando o número e os nomes
+    em ordem alfabética. É erro de desenvolvimento: ninguém trata.
     """
     pasta = Path(pasta)
     if not pasta.is_dir():
         return []
-    migracoes = []
+    por_numero: dict[int, list[Path]] = {}
     for arquivo in pasta.iterdir():
         encontrado = _PADRAO_ARQUIVO.match(arquivo.name)
         if encontrado and arquivo.is_file():
-            migracoes.append((int(encontrado.group(1)), arquivo))
-    migracoes.sort(key=lambda item: item[0])
-    return migracoes
+            por_numero.setdefault(int(encontrado.group(1)), []).append(arquivo)
+
+    for numero, arquivos in sorted(por_numero.items()):
+        if len(arquivos) > 1:
+            nomes = ", ".join(sorted(arquivo.name for arquivo in arquivos))
+            raise ValueError(
+                f"Migrações com número repetido ({numero}): {nomes}."
+            )
+
+    return sorted(
+        ((numero, arquivos[0]) for numero, arquivos in por_numero.items()),
+        key=lambda item: item[0],
+    )
 
 
 def versao_atual(pasta: Path | str = PASTA_MIGRACOES) -> int:
