@@ -26,6 +26,24 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARQUIVO_EQUIPES = os.path.join(BASE_DIR, "equipes.json")
 DIR_SAVES = os.path.join(BASE_DIR, "saves")
 
+# Texto único (terminal e web) para quando o `.db` está em uso (E-015).
+MENSAGEM_SAVE_TRAVADO = (
+    "Não foi possível salvar: o arquivo da carreira está em uso por outro "
+    "programa (por exemplo, o jogo aberto no terminal e no navegador ao "
+    "mesmo tempo)."
+)
+
+# Códigos primários do SQLite que indicam banco travado por outra conexão.
+_CODIGOS_DE_TRAVA = (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+# Máscara que tira o código estendido (ex.: SQLITE_BUSY_SNAPSHOT) e deixa o primário.
+_MASCARA_CODIGO_PRIMARIO = 0xFF
+
+
+class SaveTravado(Exception):
+    """O save não foi gravado porque o arquivo da carreira está em uso por
+    outra conexão. O save anterior fica intacto; dá para tentar de novo.
+    """
+
 
 def carregar_equipes():
     if os.path.exists(ARQUIVO_EQUIPES):
@@ -161,13 +179,32 @@ def salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados,
 
     `classificados=None` = temporada nova, ainda não sorteada; `historico`
     = temporadas já concluídas nesta carreira.
+
+    Levanta `SaveTravado` (com o `sqlite3.OperationalError` original em
+    `__cause__`) se o arquivo estiver em uso por outra conexão além do
+    timeout; qualquer outro erro sobe intacto.
     """
     os.makedirs(DIR_SAVES, exist_ok=True)
-    with abrir(_caminho_save(nome_save), criar=True) as conn:
-        migrar(conn)
-        with conn:
-            gravar_carreira(conn, campeonato, temporada, time_escolhido, classificados)
-            gravar_historico(conn, historico or [])
+    try:
+        with abrir(_caminho_save(nome_save), criar=True) as conn:
+            migrar(conn)
+            with conn:
+                gravar_carreira(conn, campeonato, temporada, time_escolhido, classificados)
+                gravar_historico(conn, historico or [])
+    except sqlite3.OperationalError as erro:
+        if _erro_de_trava(erro):
+            raise SaveTravado(MENSAGEM_SAVE_TRAVADO) from erro
+        raise
+
+
+def _erro_de_trava(erro: sqlite3.OperationalError) -> bool:
+    """True se o erro é de banco travado (SQLITE_BUSY/SQLITE_LOCKED). Usa
+    o código do SQLite e, na falta dele, "locked" na mensagem.
+    """
+    codigo = getattr(erro, "sqlite_errorcode", None)
+    if codigo is not None:
+        return codigo & _MASCARA_CODIGO_PRIMARIO in _CODIGOS_DE_TRAVA
+    return "locked" in str(erro).lower()
 
 
 def carregar_jogo_salvo(nome_save):

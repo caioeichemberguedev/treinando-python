@@ -277,8 +277,9 @@ def test_carregar_le_o_retrato_anterior_enquanto_outra_conexao_escreve(monkeypat
 
 def test_salvar_com_leitura_presa_falha_por_timeout_e_mantem_o_save(monkeypatch, times):
     """Robustez: se outra conexão segura uma leitura (transação aberta)
-    além do `TIMEOUT_SEGUNDOS`, `salvar_jogo` desiste com "database is
-    locked" e o save anterior fica inteiro (rollback).
+    além do `TIMEOUT_SEGUNDOS`, `salvar_jogo` desiste com `SaveTravado`
+    (causa: "database is locked", E-015) e o save anterior fica inteiro
+    (rollback).
     """
     monkeypatch.setattr(conexao, "TIMEOUT_SEGUNDOS", 0.2)
     nome = _salvar_carreira_inicial(times)
@@ -289,8 +290,10 @@ def test_salvar_com_leitura_presa_falha_por_timeout_e_mantem_o_save(monkeypatch,
         leitor.execute("BEGIN")
         leitor.execute("SELECT temporada FROM carreira").fetchone()
 
-        with pytest.raises(sqlite3.OperationalError, match="locked"):
+        with pytest.raises(persistencia.SaveTravado) as erro:
             persistencia.salvar_jogo(nome, CAMPEONATO, times[0], 2027, None, historico)
+        assert isinstance(erro.value.__cause__, sqlite3.OperationalError)
+        assert "locked" in str(erro.value.__cause__)
 
         leitor.rollback()
 

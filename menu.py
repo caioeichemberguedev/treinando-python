@@ -11,6 +11,8 @@ from campeonato import (
     unificar_time_escolhido,
 )
 from persistencia import (
+    MENSAGEM_SAVE_TRAVADO,
+    SaveTravado,
     carregar_equipes,
     salvar_equipes,
     salvar_jogo,
@@ -166,6 +168,25 @@ def menu_pos_temporada(campeonato, temporada, campeao, historico):
             print(COR_TXT.ERRO, "Opção inválida.", COR_TXT.NORMAL)
 
 
+def _salvar_com_retentativa(*args) -> bool:
+    """Chama `salvar_jogo(*args)`; se o save estiver travado, avisa e deixa o
+    jogador tentar de novo (ENTER, sem limite) ou desistir ('sair').
+    Retorna True se gravou, False se o jogador desistiu.
+    """
+    while True:
+        try:
+            salvar_jogo(*args)
+            return True
+        except SaveTravado:
+            print(COR_TXT.ERRO, MENSAGEM_SAVE_TRAVADO, COR_TXT.NORMAL)
+            escolha = input(
+                "ENTER para tentar de novo, ou digite 'sair' para voltar ao menu sem salvar: "
+            ).strip().lower()
+            if escolha == "sair":
+                print(COR_TXT.ATENCAO, "O último progresso salvo continua valendo.", COR_TXT.NORMAL)
+                return False
+
+
 def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classificados, times, historico=None):
     historico = historico or []
 
@@ -174,7 +195,8 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
             print(COR_TXT.ERRO, "Esse campeonato não tem equipes suficientes para a nova temporada.", COR_TXT.NORMAL)
             return
         classificados = sortear_classificados(times)
-        salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados, historico)
+        if not _salvar_com_retentativa(nome_save, campeonato, time_escolhido, temporada, classificados, historico):
+            return
 
     os.system('cls')
     print("Campeonato:", campeonato)
@@ -203,13 +225,15 @@ def rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classifica
             }]
 
             proxima_temporada = temporada + 1
-            salvar_jogo(nome_save, campeonato, time_escolhido, proxima_temporada, None, historico)
+            if not _salvar_com_retentativa(nome_save, campeonato, time_escolhido, proxima_temporada, None, historico):
+                return
 
             if menu_pos_temporada(campeonato, temporada, campeao.nome, historico):
                 rodar_temporada(nome_save, campeonato, time_escolhido, proxima_temporada, None, times, historico)
             return
 
-        salvar_jogo(nome_save, campeonato, time_escolhido, temporada, proximos, historico)
+        if not _salvar_com_retentativa(nome_save, campeonato, time_escolhido, temporada, proximos, historico):
+            return
 
         escolha = input("\nENTER para a próxima fase, ou digite 'sair' para voltar ao menu: ").strip().lower()
         if escolha == "sair":
@@ -229,7 +253,8 @@ def novo_jogo(equipes):
     temporada = 2026
     classificados = sortear_classificados(times)
     nome_save = gerar_nome_save()
-    salvar_jogo(nome_save, campeonato, time_escolhido, temporada, classificados)
+    if not _salvar_com_retentativa(nome_save, campeonato, time_escolhido, temporada, classificados):
+        return
     print(COR_TXT.SUCESSO, f"Nova carreira criada: {nome_save}", COR_TXT.NORMAL)
     rodar_temporada(nome_save, campeonato, time_escolhido, temporada, classificados, times)
 
