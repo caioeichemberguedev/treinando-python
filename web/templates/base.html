@@ -3,18 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block titulo %}Jogo de Futebol{% endblock %}</title>
+    <title>{% block titulo %}Simulador de Copa{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', path='css/estilo.css') }}">
 </head>
 <body>
-    <header>
-        <nav>
-            <a href="{{ url_for('inicio') }}">Jogo de Futebol</a>
-            <a href="{{ url_for('tela_saves') }}">Carreiras salvas</a>
-            <a href="{{ url_for('tela_equipes') }}">Editar equipes</a>
-            {% if jogo_em_andamento() %}
-            <a href="{{ url_for('tela_historico') }}">Histórico</a>
-            {% endif %}
+    {#- Página atual do menu (E-022), pelo caminho da URL: nenhum template
+        precisa informar nada. /fase, /novo-jogo, /admin... não marcam nada. -#}
+    {%- set caminho = request.url.path -%}
+    {%- set ativo = none -%}
+    {%- if caminho == "/" -%}{%- set ativo = "inicio" -%}
+    {%- elif caminho.startswith("/saves") -%}{%- set ativo = "saves" -%}
+    {%- elif caminho.startswith("/equipes") -%}{%- set ativo = "equipes" -%}
+    {%- elif caminho.startswith("/carreira") -%}{%- set ativo = "carreira" -%}
+    {%- elif caminho.startswith("/historico") or caminho.startswith("/campeoes") -%}{%- set ativo = "historico" -%}
+    {%- endif %}
+    <header class="topo">
+        <a class="marca" href="{{ url_for('inicio') }}"{% if ativo == "inicio" %} aria-current="page"{% endif %}><span class="marca-ponto" aria-hidden="true"></span>Simulador de Copa</a>
+        <nav aria-label="Principal">
+            <ul class="menu-topo">
+                <li><a href="{{ url_for('tela_saves') }}"{% if ativo == "saves" %} aria-current="page"{% endif %}>Carreiras salvas</a></li>
+                <li><a href="{{ url_for('tela_equipes') }}"{% if ativo == "equipes" %} aria-current="page"{% endif %}>Editar equipes</a></li>
+                {% if jogo_em_andamento() %}
+                <li><a href="{{ url_for('tela_carreira') }}"{% if ativo == "carreira" %} aria-current="page"{% endif %}>Carreira</a></li>
+                <li><a href="{{ url_for('tela_historico') }}"{% if ativo == "historico" %} aria-current="page"{% endif %}>Histórico</a></li>
+                {% endif %}
+            </ul>
         </nav>
     </header>
 
