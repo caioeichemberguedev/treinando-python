@@ -22,8 +22,10 @@ from fastapi.responses import RedirectResponse
 from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classificados
 from penaltis import CANTOS, cobranca_time_a, cobranca_time_b, criar_disputa
 from equipe import Equipe
+from estatisticas import confronto_da_final
 from persistencia import carregar_equipes, gerar_nome_save
 from web.estado import EstadoJogo, iniciar_jogo, obter_jogo, salvar_jogo_em_andamento
+from web.rotas.carreira import progresso_da_fase
 from web.templates_config import templates
 
 router = APIRouter(tags=["jogo"])
@@ -143,6 +145,32 @@ def _fechar_fase(jogo: EstadoJogo) -> None:
     salvar_jogo_em_andamento(jogo, temporada, classificados)
 
 
+def _separar_confronto_do_jogador(jogo: EstadoJogo, confrontos: list[tuple]) -> tuple[tuple | None, list[tuple]]:
+    """Separa o confronto do jogador dos demais da fase (decisão 6 do
+    E-022), para o template não precisar procurar o time: devolve
+    `(confronto_jogador, outros_confrontos)`. `confronto_jogador` é `None`
+    se o time já foi eliminado; `outros_confrontos` mantém a ordem.
+    """
+    confronto_jogador = None
+    outros_confrontos = []
+    for confronto in confrontos:
+        time_a, time_b = confronto[0], confronto[1]
+        if confronto_jogador is None and jogo.time_escolhido in (time_a, time_b):
+            confronto_jogador = confronto
+        else:
+            outros_confrontos.append(confronto)
+    return confronto_jogador, outros_confrontos
+
+
+def _final_da_temporada(jogo: EstadoJogo) -> dict | None:
+    """Placar da final da temporada atual (decisão 5 do E-022), no formato
+    de `confronto_da_final`. `None` se o histórico está vazio ou a última
+    temporada dele não é a atual."""
+    if not jogo.historico or jogo.historico[-1]["temporada"] != jogo.temporada:
+        return None
+    return confronto_da_final(jogo.historico[-1])
+
+
 @router.get("/fase")
 def tela_fase(request: Request):
     """Mostra a fase atual da temporada: nome da fase e confrontos já
@@ -170,6 +198,9 @@ def tela_fase(request: Request):
     if jogo.fase_atual["confronto_pendente"] is not None:
         return RedirectResponse(url="/fase/penaltis", status_code=303)
 
+    confrontos = jogo.fase_atual["confrontos"]
+    confronto_jogador, outros_confrontos = _separar_confronto_do_jogador(jogo, confrontos)
+
     return templates.TemplateResponse(
         request,
         "fase.html",
@@ -178,7 +209,10 @@ def tela_fase(request: Request):
             "temporada": jogo.temporada,
             "time_escolhido": jogo.time_escolhido,
             "nome_fase": jogo.fase_atual["nome_fase"],
-            "confrontos": jogo.fase_atual["confrontos"],
+            "confrontos": confrontos,
+            "confronto_jogador": confronto_jogador,
+            "outros_confrontos": outros_confrontos,
+            "progresso": progresso_da_fase(jogo, len(jogo.classificados)),
             "nome_save": jogo.nome_save,
         },
     )
@@ -375,6 +409,7 @@ def tela_campeao(request: Request):
             "temporada": jogo.temporada,
             "campeao": jogo.campeao,
             "jogador_foi_campeao": jogo.time_escolhido == jogo.campeao,
+            "final": _final_da_temporada(jogo),
         },
     )
 

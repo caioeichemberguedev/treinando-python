@@ -15,7 +15,7 @@ volta para o dashboard (PRG). É a única rota deste módulo que grava.
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from campeonato import adversario_na_proxima_fase
+from campeonato import adversario_na_proxima_fase, numero_da_fase
 from estatisticas import (
     campanha_na_temporada,
     melhor_campanha,
@@ -108,10 +108,28 @@ def _estatisticas(jogo: EstadoJogo) -> dict:
     }
 
 
+def progresso_da_fase(jogo: EstadoJogo, times_na_fase: int) -> dict | None:
+    """Progresso "Fase N de M" (E-022) para o template: `{"numero": N,
+    "total": M}`, calculado pelo número de times da fase sobre o total do
+    campeonato (`numero_da_fase`). `None` quando não dá para dizer — por
+    exemplo, estado sem `times_do_campeonato` (o template não mostra o chip).
+
+    Usado também por `web/rotas/jogo.py` (`tela_fase`).
+    """
+    resultado = numero_da_fase(times_na_fase, len(jogo.times_do_campeonato))
+    if resultado is None:
+        return None
+    numero, total = resultado
+    return {"numero": numero, "total": total}
+
+
 def _proximo_jogo(jogo: EstadoJogo) -> dict:
     """Situação do bloco "Próximo jogo" do dashboard, como um dict para o
     template. `situacao` é uma de: `"encerrada"`, `"jogo"`, `"bye"` ou
-    `"eliminado"`.
+    `"eliminado"`. Nas situações `"jogo"` e `"bye"` vem também
+    `"progresso"` (`progresso_da_fase`, E-022): com o confronto pendente,
+    sobre `jogo.classificados` (os times da fase em jogo); na previsão, sobre
+    a mesma lista passada para `adversario_na_proxima_fase`.
 
     Ordem das verificações (decisão 8 do E-019):
     1. campeão coroado → temporada encerrada;
@@ -138,6 +156,7 @@ def _proximo_jogo(jogo: EstadoJogo) -> dict:
             "situacao": "jogo",
             "nome_fase": nome_fase_curto(fase_atual["nome_fase"]),
             "adversario": adversario,
+            "progresso": progresso_da_fase(jogo, len(jogo.classificados)),
         }
 
     lista = fase_atual["proximos"] if fase_atual is not None else jogo.classificados
@@ -147,9 +166,10 @@ def _proximo_jogo(jogo: EstadoJogo) -> dict:
 
     nome_fase, adversario = previsao
     nome_fase = nome_fase_curto(nome_fase)
+    progresso = progresso_da_fase(jogo, len(lista))
     if adversario is None:
-        return {"situacao": "bye", "nome_fase": nome_fase}
-    return {"situacao": "jogo", "nome_fase": nome_fase, "adversario": adversario}
+        return {"situacao": "bye", "nome_fase": nome_fase, "progresso": progresso}
+    return {"situacao": "jogo", "nome_fase": nome_fase, "adversario": adversario, "progresso": progresso}
 
 
 @router.get("/carreira")
