@@ -19,7 +19,7 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classificados
+from campeonato import montar_confrontos_fase, registro_da_fase, sortear_classificados, total_de_fases
 from penaltis import CANTOS, cobranca_time_a, cobranca_time_b, criar_disputa
 from equipe import Equipe
 from estatisticas import confronto_da_final
@@ -33,9 +33,17 @@ router = APIRouter(tags=["jogo"])
 
 @router.get("/novo-jogo")
 def tela_novo_jogo(request: Request):
-    """Primeira tela do fluxo de novo jogo: escolher o campeonato."""
+    """Primeira tela do fluxo de novo jogo: escolher o campeonato.
+
+    Cada campeonato vai com o resumo do card (E-022-T11): quantos times tem
+    e quantas fases o mata-mata terá (`campeonato.total_de_fases`).
+    """
     equipes = carregar_equipes()
-    return templates.TemplateResponse(request, "novo_jogo.html", {"campeonatos": list(equipes.keys())})
+    campeonatos = [
+        {"nome": nome, "total_times": len(times), "total_fases": total_de_fases(len(times))}
+        for nome, times in equipes.items()
+    ]
+    return templates.TemplateResponse(request, "novo_jogo.html", {"campeonatos": campeonatos})
 
 
 @router.post("/novo-jogo")

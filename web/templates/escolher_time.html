@@ -3,22 +3,34 @@
 {% block titulo %}Escolha seu time — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>{{ campeonato }}</h1>
-    <p>Escolha seu time:</p>
+    <header class="cabecalho-tela">
+        <p class="rotulo">Escolha seu time</p>
+        <h1>{{ campeonato }}</h1>
+        <p class="subtitulo">Escolha o time da sua carreira:</p>
+    </header>
     <form method="post" action="{{ url_for('escolher_time') }}">
         <input type="hidden" name="campeonato" value="{{ campeonato }}">
-        <ul class="lista-escolha">
+        <ul class="opcoes opcoes-times">
         {% for time in times %}
             <li>
-                <label>
-                    <input type="radio" name="time" value="{{ time.id }}" required>
-                    <span class="time">{{ escudo(time, 40) }}{{ nome_time(time) }}</span>
-                    (💰 R$ {{ "{:,}".format(time.financas) }} | 👥 {{ "{:,}".format(time.fas) }} fãs |
-                    ⚡ {{ time.forca }}/100 | 🏆 {{ time.titulos }})
+                <label class="opcao opcao-card">
+                    <span class="opcao-topo">
+                        <input type="radio" name="time" value="{{ time.id }}" required
+                               aria-labelledby="time-{{ time.id }}-nome" aria-describedby="time-{{ time.id }}-metricas">
+                        <span class="time opcao-titulo" id="time-{{ time.id }}-nome">{{ escudo(time, 40) }}{{ nome_time(time) }}</span>
+                    </span>
+                    <span class="metricas-compactas" id="time-{{ time.id }}-metricas">
+                        <span class="metrica-mini"><span class="metrica-rotulo">Finanças</span> <span class="metrica-valor">R$ {{ "{:,}".format(time.financas) }}</span></span>
+                        <span class="metrica-mini"><span class="metrica-rotulo">Torcedores</span> <span class="metrica-valor">{{ "{:,}".format(time.fas) }}</span></span>
+                        <span class="metrica-mini"><span class="metrica-rotulo">Força</span> <span class="metrica-valor">{{ time.forca }}/100</span></span>
+                        <span class="metrica-mini"><span class="metrica-rotulo">Títulos</span> <span class="metrica-valor">{{ time.titulos }}</span></span>
+                    </span>
                 </label>
             </li>
         {% endfor %}
         </ul>
-        <button type="submit" class="botao">Começar carreira</button>
+        <div class="acoes-centro">
+            <button type="submit" class="botao">Começar carreira</button>
+        </div>
     </form>
 {% endblock %}

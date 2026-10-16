@@ -541,6 +541,106 @@ td {
     box-shadow: inset 0 0 0 1px var(--cor-acido);
 }
 
+/* Opção em card grande (E-022-T11): novo jogo e escolha de time. O <li>
+   estica o label para os cards da linha terem a mesma altura. */
+.opcoes > li {
+    display: flex;
+    min-width: 0;
+}
+
+.opcoes-campeonatos {
+    grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+    gap: var(--espacamento);
+    max-width: 48rem;
+    margin: 0 auto;
+}
+
+.opcoes-times {
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+    gap: var(--espacamento);
+    max-width: 60rem;
+    margin: 0 auto;
+}
+
+.opcao-card {
+    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--espacamento);
+    min-width: 0;
+    padding: calc(var(--espacamento) * 1.25);
+    border-top: 2px solid var(--cor-borda-forte);
+}
+
+.opcoes-campeonatos .opcao-card {
+    justify-content: center;
+    min-height: 8rem;
+}
+
+.opcao-topo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.opcao-titulo {
+    min-width: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.opcao-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding-left: 2rem;
+}
+
+.opcao-card:has(:checked) .opcao-titulo {
+    color: var(--cor-acido);
+}
+
+/* Métricas pequenas dentro de um card de opção, sempre 2 x 2. São <span>s
+   (não <dl>), porque o card é um <label> e só aceita conteúdo inline. */
+.metricas-compactas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.metrica-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.5rem 0.4rem;
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+}
+
+.metrica-rotulo {
+    font-family: var(--fonte-numeros);
+    font-size: 0.7rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cor-texto-suave);
+}
+
+/* Sem quebra: em 320 px "R$ 10,000,000" cabe com a fonte mínima do clamp */
+.metrica-valor {
+    font-family: var(--fonte-numeros);
+    font-size: clamp(0.8rem, 3.6vw, 1rem);
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;  /* valores gigantes quebram em vez de vazar do card */
+    color: var(--cor-acido);
+}
+
 /* Campo de formulário: label em cima, input confortável embaixo */
 .campo {
     display: flex;

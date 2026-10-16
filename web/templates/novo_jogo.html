@@ -3,19 +3,30 @@
 {% block titulo %}Novo jogo — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Novo jogo</h1>
-    <p>Escolha o campeonato:</p>
+    <header class="cabecalho-tela">
+        <p class="rotulo">Nova carreira</p>
+        <h1>Novo jogo</h1>
+        <p class="subtitulo">Escolha o campeonato:</p>
+    </header>
     <form method="post" action="{{ url_for('escolher_campeonato') }}">
-        <ul class="lista-escolha">
+        <ul class="opcoes opcoes-campeonatos">
         {% for campeonato in campeonatos %}
             <li>
-                <label>
-                    <input type="radio" name="campeonato" value="{{ campeonato }}" required>
-                    {{ campeonato }}
+                <label class="opcao opcao-card">
+                    <span class="opcao-topo">
+                        <input type="radio" name="campeonato" value="{{ campeonato.nome }}" required>
+                        <span class="opcao-titulo">{{ campeonato.nome }}</span>
+                    </span>
+                    <span class="opcao-chips">
+                        <span class="chip">{{ campeonato.total_times }} {{ "time" if campeonato.total_times == 1 else "times" }}</span>
+                        <span class="chip">{{ campeonato.total_fases }} {{ "fase" if campeonato.total_fases == 1 else "fases" }}</span>
+                    </span>
                 </label>
             </li>
         {% endfor %}
         </ul>
-        <button type="submit" class="botao">Continuar</button>
+        <div class="acoes-centro">
+            <button type="submit" class="botao">Continuar</button>
+        </div>
     </form>
 {% endblock %}

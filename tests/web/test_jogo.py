@@ -861,3 +861,147 @@ def test_telas_de_jogo_com_times_de_teste_seguem_com_o_nome_do_equipes_json():
         assert ">Time A</span>" in html
         assert ">Time B</span>" in html
     assert re.search(r">Time [AB]</span>", campeao.text)
+
+
+# --- Novo jogo e escolha de time em cards (E-022-T11) ----------------------------
+
+def test_t11_novo_jogo_usa_opcoes_com_um_radio_por_campeonato():
+    texto = client.get("/novo-jogo").text
+
+    assert 'class="opcoes' in texto
+    assert texto.count('name="campeonato"') == 3
+    for nome in ("Campeonato Teste", "Outro Campeonato", "Copa Teste"):
+        assert f'value="{nome}"' in texto
+    assert "lista-escolha" not in texto
+    assert 'class="acoes-centro"' in texto
+    assert ">Continuar</button>" in texto
+
+
+def test_t11_novo_jogo_passa_times_e_fases_de_cada_campeonato():
+    resposta = client.get("/novo-jogo")
+
+    resumo = {c["nome"]: (c["total_times"], c["total_fases"]) for c in resposta.context["campeonatos"]}
+    assert resumo == {
+        "Campeonato Teste": (2, 1),
+        "Outro Campeonato": (2, 1),
+        "Copa Teste": (4, 2),
+    }
+
+
+def test_t11_novo_jogo_mostra_chips_de_times_e_fases():
+    texto = client.get("/novo-jogo").text
+
+    assert '<span class="chip">4 times</span>' in texto
+    assert '<span class="chip">2 fases</span>' in texto
+    assert '<span class="chip">1 fase</span>' in texto
+    assert "1 fases" not in texto
+
+
+def test_t11_escolher_time_tem_metricas_sem_emojis():
+    texto = client.post("/novo-jogo", data={"campeonato": "Campeonato Teste"}).text
+
+    for emoji in ("💰", "👥", "⚡", "🏆"):
+        assert emoji not in texto
+    for rotulo in ("Finanças", "Torcedores", "Força", "Títulos"):
+        assert f'<span class="metrica-rotulo">{rotulo}</span>' in texto
+    assert '<span class="metrica-valor">R$ 1,000,000</span>' in texto
+    assert '<span class="metrica-valor">50/100</span>' in texto
+    assert 'class="metricas-compactas"' in texto
+
+
+def test_t11_escolher_time_sem_dl_dentro_do_label():
+    texto = client.post("/novo-jogo", data={"campeonato": "Campeonato Teste"}).text
+
+    for tag in ("<dl", "<dt", "<dd"):
+        assert tag not in texto
+
+
+def test_t11_radio_do_time_nomeado_pelo_nome_e_descrito_pelas_metricas():
+    texto = client.post("/novo-jogo", data={"campeonato": "Campeonato Teste"}).text
+
+    assert 'aria-labelledby="time-901-nome"' in texto
+    assert 'aria-describedby="time-901-metricas"' in texto
+    assert 'id="time-901-nome"' in texto
+    assert 'id="time-901-metricas"' in texto
+
+
+def test_t11_escolher_time_usa_opcoes_e_nao_lista_escolha():
+    texto = client.post("/novo-jogo", data={"campeonato": "Copa Teste"}).text
+
+    assert 'class="opcoes' in texto
+    assert texto.count('class="opcao ') == 4
+    assert texto.count('name="time"') == 4
+    assert "lista-escolha" not in texto
+    assert 'class="acoes-centro"' in texto
+    assert ">Começar carreira</button>" in texto
+
+
+def _equipes_extra(monkeypatch, tmp_path, dados):
+    arquivo = tmp_path / "equipes_extra.json"
+    arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    monkeypatch.setattr(persistencia, "ARQUIVO_EQUIPES", str(arquivo))
+
+
+def _time(id_time, nome, financas=1_000_000):
+    return {"id": id_time, "nome": nome, "financas": financas, "fas": 1_000, "titulos": 0, "forca": 50}
+
+
+def test_t11_borda_campeonato_impar_conta_fase_do_bye(monkeypatch, tmp_path):
+    _equipes_extra(monkeypatch, tmp_path, {"Impar": [_time(921, "I1"), _time(922, "I2"), _time(923, "I3")]})
+
+    resposta = client.get("/novo-jogo")
+
+    assert resposta.context["campeonatos"] == [{"nome": "Impar", "total_times": 3, "total_fases": 2}]
+    assert '<span class="chip">3 times</span>' in resposta.text
+    assert '<span class="chip">2 fases</span>' in resposta.text
+
+
+def test_t11_borda_campeonato_de_um_time_usa_singular_e_zero_fases(monkeypatch, tmp_path):
+    _equipes_extra(monkeypatch, tmp_path, {"Solo": [_time(931, "S1")]})
+
+    texto = client.get("/novo-jogo").text
+
+    assert '<span class="chip">1 time</span>' in texto
+    assert '<span class="chip">0 fases</span>' in texto
+
+
+def test_t11_borda_nome_de_campeonato_com_caracteres_especiais_e_escapado_e_aceito(monkeypatch, tmp_path):
+    nome = 'Copa "A" & <B>'
+    _equipes_extra(monkeypatch, tmp_path, {nome: [_time(941, "E1"), _time(942, "E2")]})
+
+    texto = client.get("/novo-jogo").text
+    assert 'value="Copa &#34;A&#34; &amp; &lt;B&gt;"' in texto
+    assert "<B>" not in texto
+
+    escolha = client.post("/novo-jogo", data={"campeonato": nome})
+    assert escolha.status_code == 200
+    assert texto.count('name="campeonato"') == 1
+    assert 'id="time-941-nome"' in escolha.text and 'id="time-942-metricas"' in escolha.text
+
+
+def test_t11_borda_ids_aria_do_card_existem_para_cada_time():
+    texto = client.post("/novo-jogo", data={"campeonato": "Copa Teste"}).text
+
+    referencias = re.findall(r'aria-(?:labelledby|describedby)="([^"]+)"', texto)
+    assert len(referencias) == 8
+    for ref in referencias:
+        assert texto.count(f'id="{ref}"') == 1
+
+
+def test_t11_borda_financas_zeradas_aparecem_no_card(monkeypatch, tmp_path):
+    _equipes_extra(monkeypatch, tmp_path, {"Pobre": [_time(951, "P1", financas=0), _time(952, "P2")]})
+
+    texto = client.post("/novo-jogo", data={"campeonato": "Pobre"}).text
+
+    assert '<span class="metrica-valor">R$ 0</span>' in texto
+
+
+def test_t11_borda_fluxo_completo_pelos_cards_cria_o_jogo():
+    client.get("/novo-jogo")
+    client.post("/novo-jogo", data={"campeonato": "Copa Teste"})
+    resposta = client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "906"}, follow_redirects=False)
+
+    assert resposta.status_code == 303
+    jogo = estado.obter_jogo()
+    assert jogo is not None
+    assert jogo.time_escolhido.id == 906
