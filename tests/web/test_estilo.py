@@ -141,3 +141,82 @@ def test_aliases_nao_apontam_para_si_mesmos(css):
     for nome, alvo in re.findall(r"(--[\w-]+)\s*:\s*var\((--[\w-]+)\)", root):
         assert nome != alvo
         assert re.search(re.escape(alvo) + r"\s*:\s*#[0-9a-fA-F]{6}\s*;", root), alvo
+
+
+# --- E-022-T3: botões com variantes -------------------------------------------
+
+def test_botao_primario_acido_com_alvo_de_toque(css):
+    botao = _bloco(css, ".botao")
+
+    assert "background-color: var(--cor-acido)" in botao
+    assert re.search(r"(?<![-\w])color\s*:\s*var\(--cor-fundo\)", botao)
+    assert "min-height: 2.75rem" in botao
+    assert "display: inline-flex" in botao
+    assert "border-radius: var(--raio-pequeno)" in botao
+
+
+def test_button_botao_sem_visual_nativo(css):
+    botao = _bloco(css, ".botao")
+
+    assert "font: inherit" in botao
+    assert "cursor: pointer" in botao
+
+
+def test_hover_do_botao_nao_vira_ambar(css):
+    assert "--cor-destaque" not in _bloco(css, ".botao:hover")
+
+
+@pytest.mark.parametrize("seletor", [".botao-secundario", ".botao-perigo", ".botao-pequeno"])
+def test_variantes_de_botao_existem(css, seletor):
+    assert _bloco(css, seletor).strip()
+
+
+def test_secundario_e_perigo_sao_transparentes_com_borda(css):
+    secundario = _bloco(css, ".botao-secundario")
+    perigo = _bloco(css, ".botao-perigo")
+
+    assert "background-color: transparent" in secundario
+    assert "border-color: var(--cor-borda-forte)" in secundario
+    assert "background-color: transparent" in perigo
+    assert "border-color: var(--cor-erro)" in perigo
+    assert re.search(r"(?<![-\w])color\s*:\s*var\(--cor-erro\)", perigo)
+
+
+def test_botao_pequeno_volta_a_44px_no_celular(css):
+    achado = re.search(
+        r"@media \(max-width: 40rem\), \(pointer: coarse\)\s*\{\s*\.botao-pequeno\s*\{([^}]*)\}", css
+    )
+
+    assert achado
+    assert "min-height: 2.75rem" in achado.group(1)
+
+
+def test_transicao_do_botao_zerada_no_movimento_reduzido(css):
+    inicio = css.index("@media (prefers-reduced-motion: reduce)")
+    trecho = css[inicio:]
+
+    seletores_zerados = re.findall(r"([^{}]+)\{[^}]*transition:\s*none", trecho)
+
+    assert any(re.search(r"(?<![-\w])\.botao(?![-\w])", sel) for sel in seletores_zerados)
+
+
+def test_aviso_save_travado_e_card_de_erro(css):
+    aviso = _bloco(css, ".aviso-save-travado")
+
+    assert "background-color: var(--cor-card)" in aviso
+    assert "var(--cor-erro)" in aviso
+
+
+@pytest.mark.parametrize("variante", [".botao-secundario", ".botao-perigo", ".botao-pequeno"])
+def test_variante_vem_depois_do_botao_na_cascata(css, variante):
+    """Mesma especificidade de .botao: a variante só vence se vier depois."""
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    pos_botao = re.search(r"(?:^|\})\s*\.botao\s*\{", sem_comentarios).start()
+    pos_variante = re.search(r"(?:^|\})\s*" + re.escape(variante) + r"\s*\{", sem_comentarios).start()
+
+    assert pos_botao < pos_variante
+
+
+@pytest.mark.parametrize("seletor", [".botao-secundario:hover", ".botao-perigo:hover"])
+def test_hover_das_variantes_nao_vira_ambar(css, seletor):
+    assert "--cor-destaque" not in _bloco(css, seletor)

@@ -71,18 +71,70 @@ footer {
     color: var(--cor-texto-suave);
 }
 
+/* Botões (E-022): .botao é a ação primária (uma por grupo); as variantes
+   secundária e perigo são transparentes, só com borda. Alvo mínimo de 44 px. */
 .botao {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background-color: var(--cor-primaria-clara);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.1rem;
+    margin: 0;
+    background-color: var(--cor-acido);
     color: var(--cor-fundo);
-    text-decoration: none;
-    border-radius: 0.25rem;
+    border: 2px solid var(--cor-acido);
+    border-radius: var(--raio-pequeno);
+    font: inherit;
     font-weight: bold;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .botao:hover {
-    background-color: var(--cor-destaque);
+    background-color: var(--cor-link);
+    border-color: var(--cor-link);
+}
+
+.botao-secundario {
+    background-color: transparent;
+    color: var(--cor-texto);
+    border-color: var(--cor-borda-forte);
+}
+
+.botao-secundario:hover {
+    background-color: var(--cor-card-elevado);
+    border-color: var(--cor-acido);
+    color: var(--cor-acido);
+}
+
+.botao-perigo {
+    background-color: transparent;
+    color: var(--cor-erro);
+    border-color: var(--cor-erro);
+}
+
+.botao-perigo:hover {
+    background-color: #2a1f1c;
+    background-color: color-mix(in srgb, var(--cor-erro) 12%, var(--cor-card));
+    border-color: var(--cor-erro);
+    color: var(--cor-erro);
+}
+
+/* Para tabelas e listas: menor no desktop, 44 px no toque/celular */
+.botao-pequeno {
+    min-height: 2.25rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 40rem), (pointer: coarse) {
+    .botao-pequeno {
+        min-height: 2.75rem;
+    }
 }
 
 table {
@@ -165,21 +217,29 @@ td {
     overflow-x: auto;
 }
 
-/* Aviso de save travado no topo de todas as páginas (E-015) */
+/* Aviso de save travado no topo de todas as páginas (E-015), como card de erro (E-022) */
 .aviso-save-travado {
-    border: 2px solid var(--cor-erro);
+    max-width: min(58rem, calc(100% - 2 * var(--espacamento)));
+    margin: var(--espacamento) auto 0;
+    padding: 0.75rem var(--espacamento);
+    background-color: var(--cor-card);
+    border: 1px solid var(--cor-erro);
     border-left-width: 6px;
-    margin: var(--espacamento);
-    padding: 0.5rem var(--espacamento);
-    color: var(--cor-erro);
+    border-radius: var(--raio);
+    color: var(--cor-texto);
 }
 
 .aviso-save-travado p {
     margin: 0.25rem 0;
 }
 
+.aviso-save-travado p:first-child {
+    color: var(--cor-erro);
+    font-weight: bold;
+}
+
 .aviso-save-travado form {
-    margin: 0.5rem 0 0;
+    margin: 0.75rem 0 0.25rem;
 }
 
 /* Tela inicial em blocos (M-021) */
@@ -290,7 +350,8 @@ td {
         scroll-behavior: auto;
     }
 
-    .bloco {
+    .bloco,
+    .botao {
         transition: none;
     }
 

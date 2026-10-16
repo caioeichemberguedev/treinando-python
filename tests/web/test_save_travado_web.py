@@ -404,6 +404,16 @@ def test_aviso_usa_form_post_sem_javascript(travado):
     assert "<script" not in html.lower()
 
 
+def test_botao_tentar_de_novo_usa_a_classe_botao(travado):
+    """E-022-T3: o botão do aviso ganha o visual de botão primário."""
+    _novo_jogo("Copa Teste", 905)
+
+    html = client.get("/carreira").text
+
+    assert '<button type="submit" class="botao">Tentar salvar de novo</button>' in html
+    assert 'class="aviso-save-travado" role="alert"' in html
+
+
 # --- E-014-T5: o retrato pendente inclui as fases da temporada ----------------
 
 def test_tentar_de_novo_grava_as_fases_do_momento_da_falha(travado, monkeypatch):
