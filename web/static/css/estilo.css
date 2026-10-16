@@ -1,13 +1,29 @@
+/* Tokens (E-022): identidade "acid tech leve". Contrastes na auditoria. */
 :root {
-    --cor-fundo: #0f1a12;
-    --cor-texto: #f2f2f2;
-    --cor-primaria: #2e7d32;
-    --cor-primaria-clara: #4caf50;
-    --cor-destaque: #ffb300;
-    --cor-erro: #e57373;
+    --cor-fundo: #0b140e;
+    --cor-card: #122019;
+    --cor-card-elevado: #183024;
+    --cor-linha: #24382a;
     --cor-borda: #2a3a2c;
-    --cor-bloco: #16241a;
+    --cor-borda-forte: #5b8463;
+    --cor-texto: #eef4ee;
+    --cor-texto-suave: #a3b8a8;
+    --cor-acido: #c6ff3d;
+    --cor-link: #7ddc6f;
+    --cor-primaria: #2e7d32;
+    --cor-destaque: #ffb300;
+    --cor-erro: #ff8a80;
+
+    /* Aliases dos nomes antigos, para os seletores atuais continuarem valendo */
+    --cor-primaria-clara: var(--cor-link);
+    --cor-bloco: var(--cor-card);
+
+    --fonte-texto: system-ui, "Segoe UI", Roboto, sans-serif;
+    --fonte-numeros: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, Menlo, monospace;
+
     --espacamento: 1rem;
+    --raio: 0.5rem;
+    --raio-pequeno: 0.25rem;
 }
 
 * {
@@ -16,9 +32,20 @@
 
 body {
     margin: 0;
-    font-family: system-ui, sans-serif;
+    font-family: var(--fonte-texto);
     background-color: var(--cor-fundo);
     color: var(--cor-texto);
+}
+
+a {
+    color: var(--cor-link);
+    text-underline-offset: 0.2em;
+}
+
+/* Foco visível em qualquer elemento navegável pelo teclado */
+:focus-visible {
+    outline: 3px solid var(--cor-acido);
+    outline-offset: 3px;
 }
 
 header {
@@ -41,7 +68,7 @@ main {
 footer {
     text-align: center;
     padding: var(--espacamento);
-    color: var(--cor-borda);
+    color: var(--cor-texto-suave);
 }
 
 .botao {
@@ -70,7 +97,22 @@ th, td {
     text-align: left;
 }
 
+/* Cabeçalho de tabela como rótulo HUD */
+thead th {
+    font-family: var(--fonte-numeros);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cor-texto-suave);
+}
+
+td {
+    font-variant-numeric: tabular-nums;
+}
+
 .destaque {
+    font-family: var(--fonte-numeros);
     font-size: 1.5rem;
     font-weight: bold;
     color: var(--cor-destaque);
@@ -210,6 +252,7 @@ th, td {
 .bloco-destaque {
     grid-column: 1 / -1;
     border-color: var(--cor-destaque);
+    background-color: #2a2f16;
     background-color: color-mix(in srgb, var(--cor-destaque) 10%, var(--cor-bloco));
 }
 
@@ -236,7 +279,17 @@ th, td {
     opacity: 1;
 }
 
+/* Movimento reduzido: o global zera transições e animações sem classe
+   própria; componentes com transition em classe repetem a regra aqui. */
 @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none;
+        animation: none;
+        scroll-behavior: auto;
+    }
+
     .bloco {
         transition: none;
     }
