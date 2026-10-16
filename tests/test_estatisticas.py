@@ -3,6 +3,7 @@ import inspect
 
 from estatisticas import (
     campanha_na_temporada,
+    confronto_da_final,
     confrontos_do_time,
     melhor_campanha,
     resumo_da_carreira,
@@ -450,3 +451,96 @@ def test_funcoes_de_campanha_nao_alteram_o_que_recebem():
 
     assert historico == HISTORICO
     assert campanhas == copia_campanhas
+
+
+# --- Placar da final (E-022-T2) ---
+
+
+def test_confronto_da_final_temporada_concluida():
+    """Temporada normal → os 5 campos da única partida da última fase."""
+    assert confronto_da_final(HISTORICO[0]) == {
+        "id_a": 4,
+        "id_b": 1,
+        "id_vencedor": 1,
+        "gols_a": 3,
+        "gols_b": 4,
+    }
+
+
+def test_confronto_da_final_sem_campeao_devolve_none():
+    """Temporada em andamento (campeão None) não tem final para mostrar."""
+    temporada = copy.deepcopy(HISTORICO[0])
+    temporada["campeao"] = None
+
+    assert confronto_da_final(temporada) is None
+
+
+def test_confronto_da_final_sem_fases_devolve_none():
+    """Temporada concluída sem nenhuma fase registrada → None."""
+    assert confronto_da_final({"temporada": 2026, "campeao": 1, "fases": []}) is None
+    assert confronto_da_final({"temporada": 2026, "campeao": 1}) is None
+
+
+def test_confronto_da_final_ultima_fase_com_dois_confrontos_devolve_none():
+    """Se a última fase registrada não é uma final (2 jogos) → None."""
+    temporada = {
+        "temporada": 2026,
+        "campeao": 1,
+        "fases": [
+            {
+                "nome_fase": "Semifinal - Copa X",
+                "confrontos": [[1, 2, 1, 5, 3], [3, 4, 4, 2, 4]],
+            },
+        ],
+    }
+
+    assert confronto_da_final(temporada) is None
+
+
+def test_confronto_da_final_vencedor_diferente_do_campeao_devolve_none():
+    """Histórico inconsistente (vencedor da final ≠ campeão) → None."""
+    temporada = copy.deepcopy(HISTORICO[0])
+    temporada["campeao"] = 4
+
+    assert confronto_da_final(temporada) is None
+
+
+def test_confronto_da_final_nao_altera_a_temporada():
+    """A função é pura: o dict recebido continua igual."""
+    temporada = copy.deepcopy(HISTORICO[0])
+    original = copy.deepcopy(temporada)
+
+    confronto_da_final(temporada)
+
+    assert temporada == original
+
+
+# --- Bordas do placar da final (tester, E-022-T2) ---
+
+
+def test_confronto_da_final_empate_decidido_nos_penaltis_mantem_gols():
+    """Final 'empatada' não existe no mata-mata por pênaltis, mas o placar
+    é repassado como está (gols do lado a e do lado b, sem reordenar)."""
+    temporada = {
+        "temporada": 2027,
+        "campeao": 7,
+        "fases": [{"nome_fase": "Final - Copa X", "confrontos": [[3, 7, 7, 4, 5]]}],
+    }
+
+    assert confronto_da_final(temporada) == {
+        "id_a": 3, "id_b": 7, "id_vencedor": 7, "gols_a": 4, "gols_b": 5,
+    }
+
+
+def test_confronto_da_final_ultima_fase_vazia_devolve_none():
+    """Última fase sem confronto nenhum (dado corrompido) → None, sem exceção."""
+    temporada = {"temporada": 2026, "campeao": 1, "fases": [{"nome_fase": "Final", "confrontos": []}]}
+
+    assert confronto_da_final(temporada) is None
+
+
+def test_confronto_da_final_aceita_tupla_do_jogo_em_andamento():
+    """Confronto em tupla (como na memória da web) funciona igual à lista."""
+    temporada = {"temporada": 2026, "campeao": 2, "fases": [{"nome_fase": "Final", "confrontos": [(1, 2, 2, 0, 3)]}]}
+
+    assert confronto_da_final(temporada)["id_vencedor"] == 2

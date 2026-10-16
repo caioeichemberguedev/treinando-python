@@ -1,12 +1,17 @@
 import json
 import random
 
+import pytest
+
 from campeonato import (
     adversario_na_proxima_fase,
+    gerar_rodadas,
     montar_classificacao,
     montar_confrontos_fase,
+    numero_da_fase,
     registro_da_fase,
     sortear_classificados,
+    total_de_fases,
     unificar_time_escolhido,
 )
 from equipe import Equipe
@@ -380,3 +385,74 @@ def test_unificar_time_escolhido_sem_o_time_devolve_copia_igual():
     assert unificada is not times
     assert all(novo is antigo for novo, antigo in zip(unificada, times))
     assert len(unificada) == 2
+
+
+# --- Progresso "fase N de M" (E-022-T2) ---
+
+
+@pytest.mark.parametrize(
+    ("total_times", "esperado"),
+    [(16, 4), (32, 5), (12, 4), (3, 2), (2, 1), (1, 0), (0, 0)],
+)
+def test_total_de_fases(total_times, esperado):
+    """Fases até sobrar 1 time; o ímpar avança direto (12, 6, 3, 2 = 4)."""
+    assert total_de_fases(total_times) == esperado
+
+
+@pytest.mark.parametrize(
+    ("times_na_fase", "total_times", "esperado"),
+    [
+        (16, 16, (1, 4)),
+        (8, 16, (2, 4)),
+        (2, 16, (4, 4)),
+        (6, 12, (2, 4)),
+        (3, 12, (3, 4)),
+    ],
+)
+def test_numero_da_fase(times_na_fase, total_times, esperado):
+    """N conta a partir da primeira fase; M é sempre o total de fases."""
+    resultado = numero_da_fase(times_na_fase, total_times)
+
+    assert resultado == esperado
+    assert resultado[1] == total_de_fases(total_times)
+
+
+@pytest.mark.parametrize(
+    ("times_na_fase", "total_times"),
+    [(1, 16), (17, 16), (2, 0), (2, 1)],
+)
+def test_numero_da_fase_sem_resposta_devolve_none(times_na_fase, total_times):
+    """Sem fase para jogar ou com mais times que o campeonato → None."""
+    assert numero_da_fase(times_na_fase, total_times) is None
+
+
+# --- Bordas do progresso "fase N de M" (tester, E-022-T2) ---
+
+
+@pytest.mark.parametrize("total_times", [-1, -16])
+def test_total_de_fases_negativo_devolve_zero(total_times):
+    """Valor negativo (dado corrompido) não entra em laço nem dá negativo."""
+    assert total_de_fases(total_times) == 0
+
+
+@pytest.mark.parametrize(("times_na_fase", "total_times"), [(-2, 16), (0, 16), (2, -4)])
+def test_numero_da_fase_valores_zerados_ou_negativos_devolve_none(times_na_fase, total_times):
+    """Zero ou negativo em qualquer argumento → None, sem exceção."""
+    assert numero_da_fase(times_na_fase, total_times) is None
+
+
+@pytest.mark.parametrize("total_times", [2, 3, 5, 7, 12, 16, 17, 31, 32])
+def test_numero_da_fase_bate_com_o_chaveamento_real(total_times):
+    """Jogando o mata-mata de verdade (com byes nos ímpares), as fases saem
+    numeradas 1, 2, ..., M e M é o número de fases que `gerar_rodadas` produz."""
+    random.seed(total_times)
+    classificados = [Equipe(f"T{i}", id=i) for i in range(1, total_times + 1)]
+    numeros = []
+    times_na_fase = len(classificados)
+    for _, _, proximos in gerar_rodadas(classificados):
+        numeros.append(numero_da_fase(times_na_fase, total_times))
+        times_na_fase = len(proximos)
+
+    total = total_de_fases(total_times)
+    assert len(numeros) == total
+    assert numeros == [(n, total) for n in range(1, total + 1)]

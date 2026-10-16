@@ -16,6 +16,36 @@ def nome_da_fase(num_confrontos):
     return NOMES_FASE.get(num_confrontos, f"Rodada de {num_confrontos * 2}")
 
 
+def total_de_fases(total_times: int) -> int:
+    """Conta quantas fases o mata-mata tem com `total_times` times.
+
+    A cada fase sobra a metade arredondada para cima (o ímpar avança direto
+    com bye): `n -> (n + 1) // 2`, até sobrar 1 time. Com 0 ou 1 time não há
+    fase nenhuma.
+    """
+    fases = 0
+    times = total_times
+    while times > 1:
+        times = (times + 1) // 2
+        fases += 1
+    return fases
+
+
+def numero_da_fase(times_na_fase: int, total_times: int) -> tuple[int, int] | None:
+    """Diz que fase é esta: `(N, M)` para mostrar "Fase N de M" (E-022).
+
+    Calculado pelo número de times ainda vivos, não pelo histórico (funciona
+    mesmo em save com histórico incompleto, ID-014). `M` é
+    `total_de_fases(total_times)`; `N = M - total_de_fases(times_na_fase) + 1`.
+    Devolve `None` quando não dá para dizer: `total_times < 2`,
+    `times_na_fase < 2` ou `times_na_fase > total_times`.
+    """
+    if total_times < 2 or times_na_fase < 2 or times_na_fase > total_times:
+        return None
+    total = total_de_fases(total_times)
+    return total - total_de_fases(times_na_fase) + 1, total
+
+
 def sortear_classificados(times):
     """Embaralha `times` pra definir a ordem inicial do chaveamento de uma
     temporada nova. Não altera a lista recebida — retorna uma cópia.

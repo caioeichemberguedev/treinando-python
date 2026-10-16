@@ -157,6 +157,33 @@ def melhor_campanha(campanhas: list[dict]) -> dict | None:
     }
 
 
+def confronto_da_final(temporada: dict) -> dict | None:
+    """Devolve a partida da final de uma temporada concluída (E-022).
+
+    Formato: `{"id_a", "id_b", "id_vencedor", "gols_a", "gols_b"}`. Só
+    devolve quando a temporada tem campeão, a última fase tem exatamente 1
+    confronto e o vencedor dele é o campeão; senão (sem fases, em andamento,
+    histórico incompleto) devolve `None`. Não altera o dict recebido.
+    """
+    campeao = temporada.get("campeao")
+    fases = temporada.get("fases", [])
+    if campeao is None or not fases:
+        return None
+    confrontos = fases[-1]["confrontos"]
+    if len(confrontos) != 1:
+        return None
+    id_a, id_b, id_vencedor, gols_a, gols_b = confrontos[0]
+    if id_vencedor != campeao:
+        return None
+    return {
+        "id_a": id_a,
+        "id_b": id_b,
+        "id_vencedor": id_vencedor,
+        "gols_a": gols_a,
+        "gols_b": gols_b,
+    }
+
+
 def temporada_completa(temporada: dict, total_times: int) -> bool:
     """Diz se a primeira fase registrada é mesmo a primeira do torneio.
 
