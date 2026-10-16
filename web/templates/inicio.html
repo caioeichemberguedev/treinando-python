@@ -3,7 +3,32 @@
 {% block titulo %}Início — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Simulador de Copa</h1>
-    <p>Escolha um campeonato, decida os pênaltis e leve seu time até o título.</p>
-    <a class="botao" href="{{ url_for('tela_novo_jogo') }}">Novo jogo</a>
+    {% set jogo = jogo_em_andamento() %}
+    <section class="inicio-hero">
+        <h1>Simulador de Copa</h1>
+        <p>Escolha um campeonato, decida os pênaltis e leve seu time até o título.</p>
+    </section>
+
+    <section class="blocos">
+        {% if jogo %}
+        <a class="bloco bloco-destaque" href="{{ url_for('tela_carreira') }}">
+            <span class="bloco-escudo">{{ escudo(jogo.time_escolhido, 32) }}</span>
+            <h2>Continuar carreira</h2>
+            <p class="bloco-time">{{ nome_time(jogo.time_escolhido) }}</p>
+            <p>{{ jogo.campeonato }} · Temporada {{ jogo.temporada }}</p>
+        </a>
+        {% endif %}
+        <a class="bloco" href="{{ url_for('tela_novo_jogo') }}">
+            <h2>Novo jogo</h2>
+            <p>Escolha um campeonato e um time</p>
+        </a>
+        <a class="bloco" href="{{ url_for('tela_saves') }}">
+            <h2>Carreiras salvas</h2>
+            <p>Continue ou exclua uma carreira</p>
+        </a>
+        <a class="bloco" href="{{ url_for('tela_equipes') }}">
+            <h2>Editar equipes</h2>
+            <p>Finanças, torcedores e força</p>
+        </a>
+    </section>
 {% endblock %}

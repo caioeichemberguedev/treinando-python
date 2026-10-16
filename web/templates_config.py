@@ -37,6 +37,15 @@ def save_pendente() -> bool:
     return jogo is not None and jogo.save_pendente is not None
 
 
+def jogo_em_andamento():
+    """O `EstadoJogo` em andamento, ou `None` sem jogo (M-021). Lido a cada
+    render, sem guardar nada: decide se o link "Histórico" aparece no menu
+    do topo e se a home mostra o bloco "Continuar carreira"."""
+    return obter_jogo()
+
+
+templates.env.globals["jogo_em_andamento"] = jogo_em_andamento
+
 # Aviso de save travado no topo de todas as páginas (`base.html`, E-015).
 templates.env.globals["save_pendente"] = save_pendente
 templates.env.globals["mensagem_save_travado"] = persistencia.MENSAGEM_SAVE_TRAVADO

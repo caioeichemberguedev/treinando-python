@@ -91,11 +91,26 @@ def test_historico_lista_todas_as_temporadas_com_campeao():
         assert re.search(rf"<td>{temporada}</td>\s*<td>{nome}</td>", texto)
 
 
-def test_navegacao_tem_link_para_historico():
-    resposta = client.get("/")
+_LINK_HISTORICO = re.compile(r'href="[^"]*/historico"')
+
+
+@pytest.mark.parametrize("url", ["/", "/saves", "/equipes"])
+def test_navegacao_sem_jogo_nao_tem_link_para_historico(url):
+    """Sem carreira em andamento, "Histórico" some do menu (M-021)."""
+    resposta = client.get(url)
 
     assert resposta.status_code == 200
-    assert 'href="http://testserver/historico"' in resposta.text or 'href="/historico"' in resposta.text
+    assert not _LINK_HISTORICO.search(resposta.text)
+
+
+@pytest.mark.parametrize("url", ["/", "/saves"])
+def test_navegacao_com_jogo_tem_link_para_historico(url):
+    _iniciar_jogo_com_historico([])
+
+    resposta = client.get(url)
+
+    assert resposta.status_code == 200
+    assert _LINK_HISTORICO.search(resposta.text)
 
 
 def test_nomes_de_rota_sao_unicos_na_app():
@@ -510,3 +525,14 @@ def test_nome_com_html_e_escapado_no_texto_e_no_escudo(
     assert NOME_MALICIOSO not in texto
     assert "Escudo do &lt;script&gt;" in texto
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in _sem_escudo(texto)
+
+
+def test_navegacao_sem_jogo_em_novo_jogo_nao_tem_link_para_historico():
+    resposta = client.get("/novo-jogo")
+
+    assert resposta.status_code == 200
+    assert not _LINK_HISTORICO.search(resposta.text)
+
+
+def test_historico_direto_pela_url_sem_jogo_continua_404():
+    assert client.get("/historico").status_code == 404
