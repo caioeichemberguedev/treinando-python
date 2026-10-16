@@ -364,3 +364,85 @@ def test_toda_classe_com_transition_e_zerada_no_movimento_reduzido(css):
 
     for seletor in com_transicao:
         assert re.search(re.escape(seletor.strip()) + r"(?![-\w])", zerados), seletor
+
+
+# --- E-022-T6b: acento azul no lugar do verde-limão ---------------------------
+
+HEX_VERDES_ANTIGOS = ["#c6ff3d", "#d6ff70", "#7ddc6f", "#283b1d", "#2a1f1c"]
+
+
+@pytest.mark.parametrize("hex_antigo", HEX_VERDES_ANTIGOS)
+def test_t6b_hex_verde_antigo_nao_aparece_mais(css, hex_antigo):
+    assert hex_antigo not in css.lower()
+
+
+@pytest.mark.parametrize(
+    "token, valor",
+    [
+        ("--cor-acido", "#00bfff"),
+        ("--cor-acido-claro", "#66d9ff"),
+        ("--cor-azul-2", "#1e90ff"),
+        ("--cor-link", "#7cc8ff"),
+    ],
+)
+def test_t6b_tokens_azuis(css, token, valor):
+    root = _bloco(css, ":root")
+
+    assert re.search(re.escape(token) + r"\s*:\s*" + re.escape(valor) + r"\s*;", root, re.I)
+
+
+def test_t6b_todo_var_usado_esta_definido(css):
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    usados = set(re.findall(r"var\(\s*(--[\w-]+)", sem_comentarios))
+    definidos = set(re.findall(r"(--[\w-]+)\s*:", sem_comentarios))
+
+    assert usados - definidos == set()
+
+
+def _luminancia(hex_cor):
+    canais = [int(hex_cor.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in canais]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _contraste(a, b):
+    claro, escuro = sorted([_luminancia(a), _luminancia(b)], reverse=True)
+    return (claro + 0.05) / (escuro + 0.05)
+
+
+def _token(css, nome):
+    root = _bloco(css, ":root")
+    achado = re.search(re.escape(nome) + r"\s*:\s*(#[0-9a-fA-F]{6})", root)
+    assert achado, f"token {nome} sem hex"
+    return achado.group(1)
+
+
+@pytest.mark.parametrize("texto", ["--cor-acido", "--cor-link"])
+@pytest.mark.parametrize("fundo", ["--cor-fundo", "--cor-card", "--cor-card-elevado"])
+def test_t6b_azul_de_texto_tem_contraste_aa_sobre_fundos(css, texto, fundo):
+    assert _contraste(_token(css, texto), _token(css, fundo)) >= 4.5
+
+
+@pytest.mark.parametrize("fundo", ["--cor-fundo", "--cor-card", "--cor-card-elevado"])
+def test_t6b_azul_2_de_borda_tem_contraste_nao_textual(css, fundo):
+    # WCAG 1.4.11: componente de interface (borda) pede 3:1.
+    assert _contraste(_token(css, "--cor-azul-2"), _token(css, fundo)) >= 3
+
+
+def test_t6b_azul_2_so_e_usado_em_borda(css):
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    propriedades = re.findall(r"([\w-]+)\s*:[^;{}]*var\(--cor-azul-2\)", sem_comentarios)
+
+    assert propriedades
+    assert all(p.startswith("border") for p in propriedades)
+
+
+@pytest.mark.parametrize("fundo_botao", ["--cor-acido", "--cor-acido-claro"])
+def test_t6b_texto_do_botao_primario_tem_contraste_aa(css, fundo_botao):
+    assert _contraste(_token(css, "--cor-fundo"), _token(css, fundo_botao)) >= 4.5
+
+
+def test_t6b_botao_hover_usa_azul_claro(css):
+    hover = _bloco(css, ".botao:hover")
+
+    assert "var(--cor-acido-claro)" in hover

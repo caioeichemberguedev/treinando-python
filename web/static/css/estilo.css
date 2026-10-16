@@ -1,4 +1,6 @@
-/* Tokens (E-022): identidade "acid tech leve". Contrastes na auditoria. */
+/* Tokens (E-022): identidade "acid tech leve" com acento azul (E-022-T6b).
+   Contraste sobre --cor-fundo / --cor-card: acido 8.8 / 7.9, azul-2 5.8 / 5.2,
+   link 10.3 / 9.3; texto --cor-fundo sobre o botão: 8.8 (hover 11.5). */
 :root {
     --cor-fundo: #0b140e;
     --cor-card: #122019;
@@ -8,8 +10,10 @@
     --cor-borda-forte: #5b8463;
     --cor-texto: #eef4ee;
     --cor-texto-suave: #a3b8a8;
-    --cor-acido: #c6ff3d;
-    --cor-link: #7ddc6f;
+    --cor-acido: #00bfff;        /* deep sky blue: números, foco, botão, topo dos cards */
+    --cor-acido-claro: #66d9ff;  /* hover do botão primário */
+    --cor-azul-2: #1e90ff;       /* dodger blue: bordas de hover secundárias */
+    --cor-link: #7cc8ff;
     --cor-primaria: #2e7d32;
     --cor-destaque: #ffb300;
     --cor-erro: #ff8a80;
@@ -169,8 +173,8 @@ footer {
 }
 
 .botao:hover {
-    background-color: var(--cor-link);
-    border-color: var(--cor-link);
+    background-color: var(--cor-acido-claro);
+    border-color: var(--cor-acido-claro);
 }
 
 .botao-secundario {
@@ -181,7 +185,7 @@ footer {
 
 .botao-secundario:hover {
     background-color: var(--cor-card-elevado);
-    border-color: var(--cor-acido);
+    border-color: var(--cor-azul-2);
     color: var(--cor-acido);
 }
 
@@ -192,7 +196,7 @@ footer {
 }
 
 .botao-perigo:hover {
-    background-color: #2a1f1c;
+    background-color: #2e2d25;
     background-color: color-mix(in srgb, var(--cor-erro) 12%, var(--cor-card));
     border-color: var(--cor-erro);
     color: var(--cor-erro);
@@ -522,7 +526,7 @@ td {
 
 .opcao:hover {
     background-color: var(--cor-card-elevado);
-    border-color: var(--cor-acido);
+    border-color: var(--cor-azul-2);
 }
 
 /* Fallback para navegador sem :has(): a borda acende no foco */
@@ -531,7 +535,7 @@ td {
 }
 
 .opcao:has(:checked) {
-    background-color: #283b1d;
+    background-color: #103335;
     background-color: color-mix(in srgb, var(--cor-acido) 12%, var(--cor-card));
     border-color: var(--cor-acido);
     box-shadow: inset 0 0 0 1px var(--cor-acido);
@@ -569,7 +573,7 @@ td {
 
 .campo input:hover,
 .campo select:hover {
-    border-color: var(--cor-acido);
+    border-color: var(--cor-azul-2);
 }
 
 .campo .ajuda {
