@@ -116,3 +116,52 @@ def test_inicio_nao_usa_javascript():
 
     assert "<script" not in texto.lower()
     assert "onclick" not in texto.lower()
+
+
+# --- E-022-T5: home no novo visual ---
+
+def _bloco_destaque(texto):
+    inicio = texto.index('class="bloco bloco-destaque"')
+    return texto[inicio:texto.index("</a>", inicio)]
+
+
+def test_inicio_com_jogo_mostra_chip_da_temporada_no_bloco_destaque():
+    _iniciar_jogo(temporada=2028)
+
+    bloco = _bloco_destaque(client.get("/").text)
+
+    assert '<span class="chip">Temporada 2028</span>' in bloco
+
+
+def test_inicio_com_jogo_mostra_chip_do_campeonato_no_bloco_destaque():
+    _iniciar_jogo()
+
+    bloco = _bloco_destaque(client.get("/").text)
+
+    assert '<span class="chip">Copa do Brasil</span>' in bloco
+
+
+def test_inicio_sem_jogo_nao_mostra_chips():
+    texto = client.get("/").text
+
+    assert 'class="chip"' not in texto
+
+
+def test_inicio_mantem_ordem_dos_blocos():
+    _iniciar_jogo()
+
+    texto = client.get("/").text
+    posicoes = [texto.index(titulo) for titulo in
+                ("Continuar carreira", "<h2>Novo jogo</h2>", "<h2>Carreiras salvas</h2>", "<h2>Editar equipes</h2>")]
+
+    assert posicoes == sorted(posicoes)
+
+
+def test_inicio_campeonato_no_chip_e_escapado():
+    escolhido = Equipe("Time", id=SAO_PAULO)
+    estado.iniciar_jogo("<i>Copa</i>", escolhido, 2026, [escolhido])
+
+    texto = client.get("/").text
+
+    assert "<i>Copa</i>" not in texto
+    assert '<span class="chip">&lt;i&gt;Copa&lt;/i&gt;</span>' in texto

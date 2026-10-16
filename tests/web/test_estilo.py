@@ -220,3 +220,147 @@ def test_variante_vem_depois_do_botao_na_cascata(css, variante):
 @pytest.mark.parametrize("seletor", [".botao-secundario:hover", ".botao-perigo:hover"])
 def test_hover_das_variantes_nao_vira_ambar(css, seletor):
     assert "--cor-destaque" not in _bloco(css, seletor)
+
+
+# --- E-022-T5: componentes de dashboard e home ---------------------------------
+
+COMPONENTES = [
+    ".cabecalho-tela",
+    ".cards",
+    ".card",
+    ".card-largo",
+    ".card-estreito",
+    ".card-destaque",
+    ".card-erro",
+    ".card > h2",
+    ".rotulo",
+    ".metricas",
+    ".metrica",
+    ".metrica dt",
+    ".metrica dd",
+    ".placar",
+    ".placar-gols",
+    ".placar-x",
+    ".chip",
+    ".chip-acido",
+    ".chip-destaque",
+    ".chip-erro",
+    ".opcoes",
+    ".opcao",
+    ".campo",
+    ".erros",
+    ".acoes-centro",
+    ".numero",
+    ".visualmente-oculto",
+    ".tabela-rolavel",
+]
+
+
+def _bloco_lista(css, *seletores):
+    """Como `_bloco`, para um grupo de seletores separados por vírgula (qualquer quebra de linha)."""
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    grupo = r",\s*".join(re.escape(seletor) for seletor in seletores)
+    achado = re.search(r"(?:^|\})\s*" + grupo + r"\s*\{([^}]*)\}", sem_comentarios)
+    assert achado, f"bloco {seletores!r} não encontrado"
+    return achado.group(1)
+
+
+@pytest.mark.parametrize("seletor", COMPONENTES)
+def test_componentes_de_dashboard_existem(css, seletor):
+    assert _bloco(css, seletor).strip()
+
+
+def test_componentes_ficam_numa_secao_propria(css):
+    assert "/* Componentes (E-022)" in css
+
+
+def test_card_tem_fundo_de_card_e_topo_acido(css):
+    card = _bloco(css, ".card")
+
+    assert "background-color: var(--cor-card)" in card
+    assert "border-top: 2px solid var(--cor-acido)" in card
+    assert "min-width: 0" in card
+
+
+def test_grades_usam_min_para_nao_estourar_no_celular(css):
+    for seletor in (".cards", ".metricas", ".opcoes", ".blocos"):
+        assert re.search(r"minmax\(min\([\d.]+rem, 100%\)", _bloco(css, seletor)), seletor
+
+
+def test_tabela_rolavel_tem_rolagem_e_borda_de_card(css):
+    tabela = _bloco(css, ".tabela-rolavel")
+
+    assert "overflow-x: auto" in tabela
+    assert "background-color: var(--cor-card)" in tabela
+    assert re.search(r"border:\s*1px solid var\(--cor-borda\)", tabela)
+
+
+def test_tabela_rolavel_definida_uma_vez(css):
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+
+    assert len(re.findall(r"(?:^|\})\s*\.tabela-rolavel\s*\{", sem_comentarios)) == 1
+
+
+def test_opcao_marcada_e_focada_acende_em_acido(css):
+    assert "border-color: var(--cor-acido)" in _bloco(css, ".opcao:has(:checked)")
+    assert "border-color: var(--cor-acido)" in _bloco(css, ".opcao:focus-within")
+    assert "min-height: 2.75rem" in _bloco(css, ".opcao")
+
+
+def test_campo_tem_altura_de_toque(css):
+    assert "min-height: 2.75rem" in _bloco(css, ".campo input,\n.campo select")
+
+
+def test_numeros_dos_componentes_em_mono(css):
+    for seletor in (".numero", ".metrica dd", ".placar-gols", ".chip"):
+        assert "font-family: var(--fonte-numeros)" in _bloco(css, seletor), seletor
+
+
+def test_visualmente_oculto_nao_usa_display_none(css):
+    oculto = _bloco(css, ".visualmente-oculto")
+
+    assert "display: none" not in oculto
+    assert "position: absolute" in oculto
+    assert "overflow: hidden" in oculto
+
+
+def test_bloco_da_home_vira_card_com_topo_acido(css):
+    bloco = _bloco(css, ".bloco")
+
+    assert "background-color: var(--cor-card)" in bloco
+    assert "border-top: 2px solid var(--cor-acido)" in bloco
+    assert "border-color: var(--cor-acido)" in _bloco(css, ".bloco:hover,\n.bloco:focus-visible")
+
+
+def test_bloco_destaque_continua_ambar(css):
+    assert "border-color: var(--cor-destaque)" in _bloco(css, ".bloco-destaque")
+
+
+def test_textos_secundarios_sem_opacity(css):
+    """Texto suave vem do token, não de opacity (contraste previsível)."""
+    for seletor in (".bloco p", ".inicio-hero p"):
+        bloco = _bloco(css, seletor)
+        assert "opacity" not in bloco, seletor
+        assert "color: var(--cor-texto-suave)" in bloco, seletor
+
+
+@pytest.mark.parametrize("seletor", [".bloco", ".opcao"])
+def test_transicoes_dos_componentes_zeradas_no_movimento_reduzido(css, seletor):
+    inicio = css.index("@media (prefers-reduced-motion: reduce)")
+    trecho = css[inicio:]
+
+    seletores_zerados = re.findall(r"([^{}]+)\{[^}]*transition:\s*none", trecho)
+
+    assert any(re.search(re.escape(seletor) + r"(?![-\w])", sel) for sel in seletores_zerados)
+
+
+def test_toda_classe_com_transition_e_zerada_no_movimento_reduzido(css):
+    sem_comentarios = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    inicio = sem_comentarios.index("@media (prefers-reduced-motion: reduce)")
+    antes, trecho = sem_comentarios[:inicio], sem_comentarios[inicio:]
+
+    com_transicao = re.findall(r"(?:^|\})\s*([^{}@]+?)\s*\{[^}]*\btransition\s*:\s*(?!none)", antes)
+    zerados = " ".join(re.findall(r"([^{}]+)\{[^}]*transition:\s*none", trecho))
+
+    for seletor in com_transicao:
+        assert re.search(re.escape(seletor.strip()) + r"(?![-\w])", zerados), seletor

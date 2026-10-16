@@ -15,7 +15,10 @@
             <span class="bloco-escudo">{{ escudo(jogo.time_escolhido, 32) }}</span>
             <h2>Continuar carreira</h2>
             <p class="bloco-time">{{ nome_time(jogo.time_escolhido) }}</p>
-            <p>{{ jogo.campeonato }} · Temporada {{ jogo.temporada }}</p>
+            <p class="bloco-chips">
+                <span class="chip">{{ jogo.campeonato }}</span>
+                <span class="chip">Temporada {{ jogo.temporada }}</span>
+            </p>
         </a>
         {% endif %}
         <a class="bloco" href="{{ url_for('tela_novo_jogo') }}">
