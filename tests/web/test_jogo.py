@@ -710,7 +710,7 @@ def test_fase_mostra_escudos_do_seu_time_e_de_cada_confronto():
 
     confrontos = estado.obter_jogo().fase_atual["confrontos"]
     assert len(confrontos) == 2
-    assert _contar_escudos(resposta.text) >= 3 * len(confrontos) + 1
+    assert _contar_escudos(resposta.text) >= 2 * len(confrontos) + 1  # 1 por time + o "Seu time"
     assert 'aria-label="Escudo do Copa E"' in resposta.text
 
 
@@ -1005,3 +1005,90 @@ def test_t11_borda_fluxo_completo_pelos_cards_cria_o_jogo():
     jogo = estado.obter_jogo()
     assert jogo is not None
     assert jogo.time_escolhido.id == 906
+
+
+# --- Fase em cards de confronto (E-022-T8) ----------------------------------------
+
+def _fase_com_o_jogador_na_copa_teste():
+    """Jogo novo na "Copa Teste" (4 times) com a 1ª fase decidida: o jogador
+    está num dos 2 confrontos."""
+    client.post("/novo-jogo/time", data={"campeonato": "Copa Teste", "time": "905"})
+    return _passar_pela_fase_atual()
+
+
+def _fase_sem_o_jogador():
+    """Estado montado à mão com o jogador fora dos classificados: a fase sai
+    decidida direto, sem pênaltis, e sem o confronto do jogador."""
+    elenco = persistencia.carregar_equipes()
+    jogador = elenco["Campeonato Teste"][0]
+    estado.iniciar_jogo("Copa Teste", jogador, 2026, list(elenco["Copa Teste"]))
+    resposta = client.get("/fase")
+    assert resposta.status_code == 200
+    return resposta
+
+
+def test_t8_fase_com_o_jogador_tem_um_destaque_e_mini_cards_para_os_outros():
+    resposta = _fase_com_o_jogador_na_copa_teste()
+
+    contexto = resposta.context
+    texto = resposta.text
+    assert texto.count("card-destaque") == 1
+    destaque = texto.split("card-destaque")[1].split("</section>")[0]
+    assert ">Copa E</span>" in destaque
+    assert 'height="48"' in destaque
+    assert 'class="placar-gols"' in destaque
+    assert texto.count('class="card confronto"') == len(contexto["outros_confrontos"]) == 1
+
+
+def test_t8_fase_com_o_jogador_eliminado_nao_tem_destaque():
+    resposta = _fase_sem_o_jogador()
+
+    texto = resposta.text
+    assert "card-destaque" not in texto
+    assert texto.count('class="card confronto"') == len(resposta.context["confrontos"]) == 2
+
+
+@pytest.mark.parametrize("montar", [_fase_com_o_jogador_na_copa_teste, _fase_sem_o_jogador])
+def test_t8_classificado_aparece_uma_vez_por_confronto(montar):
+    resposta = montar()
+
+    confrontos = resposta.context["confrontos"]
+    assert resposta.text.count(">Classificado</span>") == len(confrontos)
+    assert resposta.text.count("confronto-vencedor") == len(confrontos)
+
+
+def test_t8_fase_tem_um_escudo_por_time_sem_coluna_de_vencedor():
+    resposta = _fase_sem_o_jogador()
+
+    assert _contar_escudos(resposta.text) == 2 * len(resposta.context["confrontos"]) + 1
+
+
+def test_t8_fase_mostra_o_placar_de_cada_confronto():
+    resposta = _fase_sem_o_jogador()
+
+    for _, _, _, gols_a, gols_b in resposta.context["confrontos"]:
+        assert f'<p class="confronto-placar">{gols_a} x {gols_b}</p>' in resposta.text
+
+
+def test_t8_fase_mostra_o_progresso_quando_existe():
+    resposta = _fase_com_o_jogador_na_copa_teste()
+
+    assert resposta.context["progresso"] == {"numero": 1, "total": 2}
+    assert '<span class="chip chip-acido">Fase 1 de 2</span>' in resposta.text
+
+
+def test_t8_fase_sem_progresso_nao_mostra_o_chip():
+    resposta = _fase_sem_o_jogador()
+
+    assert resposta.context["progresso"] is None
+    assert "Fase 1 de" not in resposta.text
+
+
+def test_t8_fase_sem_tabela_e_com_cabecalho_em_cards():
+    resposta = _fase_com_o_jogador_na_copa_teste()
+
+    texto = resposta.text
+    assert "<table" not in texto
+    assert 'class="cabecalho-tela cabecalho-fase"' in texto
+    assert "Copa Teste · Temporada 2026" in texto
+    assert 'class="acoes-centro"' in texto

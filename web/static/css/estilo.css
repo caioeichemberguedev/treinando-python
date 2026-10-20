@@ -807,6 +807,112 @@ td {
     border-radius: 0;
 }
 
+/* Fase (E-022): o jogo do jogador em card destaque com placar grande; os
+   demais confrontos em mini-cards. Vencedor = classe + chip "Classificado". */
+.cabecalho-fase .chips {
+    margin-bottom: 0.5rem;
+}
+
+.cabecalho-fase .subtitulo + .subtitulo {
+    margin-top: 0.25rem;
+}
+
+.card-jogo-jogador {
+    max-width: 40rem;
+    margin: 0 auto calc(var(--espacamento) * 2);
+}
+
+.placar-fase {
+    gap: 0.75rem;
+}
+
+.placar-lado {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.placar-fase .time {
+    font-size: 1.1rem;
+    line-height: 1.25;
+    color: var(--cor-texto-suave);
+}
+
+.placar-fase .confronto-vencedor .time {
+    font-weight: 700;
+    color: var(--cor-texto);
+}
+
+.placar-legenda {
+    margin: var(--espacamento) 0 0;
+    font-size: 0.9rem;
+    text-align: center;
+    color: var(--cor-texto-suave);
+}
+
+.titulo-secao {
+    max-width: 52rem;
+    margin: 0 auto 0.75rem;
+    font-family: var(--fonte-numeros);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: center;
+    color: var(--cor-texto-suave);
+}
+
+/* <ul class="cards confrontos">: lista sem marcador, mesma grade dos cards */
+.confrontos {
+    padding: 0;
+    list-style: none;
+}
+
+.confronto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: var(--espacamento);
+}
+
+.confronto-time {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem 0.75rem;
+    min-width: 0;
+    color: var(--cor-texto-suave);
+}
+
+.confronto-time .time {
+    min-width: 0;
+}
+
+.confronto-time.confronto-vencedor {
+    font-weight: 700;
+    color: var(--cor-texto);
+}
+
+.confronto-placar {
+    margin: 0;
+    font-family: var(--fonte-numeros);
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--cor-acido);
+}
+
+/* Celular: o placar grande empilha (time, gols, time) para o chip caber */
+@media (max-width: 30rem) {
+    .placar-fase {
+        grid-template-columns: 1fr;
+    }
+}
+
 .acoes {
     display: flex;
     flex-wrap: wrap;

@@ -3,35 +3,61 @@
 {% block titulo %}{{ nome_fase }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>{{ nome_fase }}</h1>
-    <p>{{ campeonato }} — Temporada {{ temporada }}</p>
-    {% if nome_save %}
-        <p>Carreira: <strong>{{ nome_save }}</strong></p>
+    <header class="cabecalho-tela cabecalho-fase">
+        <p class="rotulo">{{ campeonato }} · Temporada {{ temporada }}</p>
+        <h1>{{ nome_fase }}</h1>
+        {% if progresso %}
+            <p class="chips"><span class="chip chip-acido">Fase {{ progresso.numero }} de {{ progresso.total }}</span></p>
+        {% endif %}
+        {% if nome_save %}
+            <p class="subtitulo">Carreira: <strong>{{ nome_save }}</strong></p>
+        {% endif %}
+        <p class="subtitulo">Seu time: <strong class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</strong></p>
+    </header>
+
+    {% if confronto_jogador %}
+        {% set time_a, time_b, vencedor, gols_a, gols_b = confronto_jogador %}
+        <section class="card card-destaque card-jogo-jogador">
+            <h2>Seu jogo</h2>
+            <div class="placar placar-fase">
+                <div class="placar-lado{% if vencedor == time_a %} confronto-vencedor{% endif %}">
+                    <span class="time">{{ escudo(time_a, 48) }}{{ nome_time(time_a) }}</span>
+                    {% if vencedor == time_a %}<span class="chip chip-acido">Classificado</span>{% endif %}
+                </div>
+                <span class="placar-gols">{{ gols_a }}<span class="placar-x"> x </span>{{ gols_b }}</span>
+                <div class="placar-lado{% if vencedor == time_b %} confronto-vencedor{% endif %}">
+                    <span class="time">{{ escudo(time_b, 48) }}{{ nome_time(time_b) }}</span>
+                    {% if vencedor == time_b %}<span class="chip chip-acido">Classificado</span>{% endif %}
+                </div>
+            </div>
+            <p class="placar-legenda">Decidido nos pênaltis</p>
+        </section>
     {% endif %}
-    <p>Seu time: <strong class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</strong></p>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Mandante</th>
-                <th>Placar</th>
-                <th>Visitante</th>
-                <th>Vencedor</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for time_a, time_b, vencedor, gols_a, gols_b in confrontos %}
-            <tr>
-                <td><span class="time">{{ escudo(time_a, 20) }}{{ nome_time(time_a) }}</span></td>
-                <td>{{ gols_a }} x {{ gols_b }}</td>
-                <td><span class="time">{{ escudo(time_b, 20) }}{{ nome_time(time_b) }}</span></td>
-                <td><span class="time">{{ escudo(vencedor, 20) }}{{ nome_time(vencedor) }}</span></td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    {% if outros_confrontos %}
+        <section class="fase-outros">
+            <h2 class="titulo-secao">{% if confronto_jogador %}Outros jogos da fase{% else %}Jogos da fase{% endif %}</h2>
+            <ul class="cards confrontos">
+            {% for time_a, time_b, vencedor, gols_a, gols_b in outros_confrontos %}
+                <li class="card confronto">
+                    <div class="confronto-time{% if vencedor == time_a %} confronto-vencedor{% endif %}">
+                        <span class="time">{{ escudo(time_a, 20) }}{{ nome_time(time_a) }}</span>
+                        {% if vencedor == time_a %}<span class="chip chip-acido">Classificado</span>{% endif %}
+                    </div>
+                    <p class="confronto-placar">{{ gols_a }} x {{ gols_b }}</p>
+                    <div class="confronto-time{% if vencedor == time_b %} confronto-vencedor{% endif %}">
+                        <span class="time">{{ escudo(time_b, 20) }}{{ nome_time(time_b) }}</span>
+                        {% if vencedor == time_b %}<span class="chip chip-acido">Classificado</span>{% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
 
-    <form method="post" action="{{ url_for('seguir_fase') }}">
-        <button type="submit" class="botao">Seguir</button>
-    </form>
+    <div class="acoes-centro">
+        <form method="post" action="{{ url_for('seguir_fase') }}">
+            <button type="submit" class="botao">Seguir</button>
+        </form>
+    </div>
 {% endblock %}
