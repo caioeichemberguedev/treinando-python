@@ -686,3 +686,78 @@ def test_padrao_invalido_da_400_e_nao_grava(
     assert catalogo.nome_do_time(1) == "São Paulo"
     assert catalogo.cores_do_time(1) == SAO_PAULO_ORIGINAL
     assert catalogo.padrao_do_time(1) == "horizontais"
+
+
+# --- Visual E-022-T15: estrutura que o CSS e a acessibilidade usam ---------
+
+
+def test_login_em_card_estreito_com_campo_e_sem_alerta(com_senha, cliente):
+    resposta = cliente.get("/admin/login")
+
+    assert 'class="card card-estreito admin-login"' in resposta.text
+    assert 'class="campo"' in resposta.text
+    assert 'for="senha"' in resposta.text
+    assert 'role="alert"' not in resposta.text
+    assert "card-erro" not in resposta.text
+
+
+def test_login_errado_mostra_alerta_em_card_de_erro(com_senha, cliente):
+    resposta = cliente.post("/admin/login", data={"senha": "errada"})
+
+    assert resposta.status_code == 401
+    assert '<p class="erros" role="alert">Senha incorreta.</p>' in resposta.text
+    assert "card-erro" in resposta.text
+    assert "value=" not in resposta.text
+
+
+def test_lista_do_admin_em_cards_com_um_editar_secundario_por_time(
+    com_senha, cliente
+):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin")
+
+    assert 'class="cards' in resposta.text
+    assert resposta.text.count('class="card card-admin-time"') == 32
+    assert resposta.text.count(
+        'class="botao botao-secundario botao-pequeno">Editar'
+    ) == 32
+    assert '<button type="submit" class="botao botao-secundario">Sair</button>' in resposta.text
+    assert '<form method="post" action="http://testserver/admin/sair">' in resposta.text
+
+
+def test_editar_time_tem_opcoes_de_padrao_e_previa_secundaria(
+    com_senha, cliente
+):
+    _logar(cliente)
+
+    resposta = cliente.get("/admin/times/3")
+
+    assert 'class="opcoes' in resposta.text
+    assert resposta.text.count('class="opcao"') == 4
+    assert resposta.text.count('for="padrao_') == 4
+    assert (
+        '<button type="submit" name="acao" value="previa" '
+        'class="botao botao-secundario">Pré-visualizar</button>'
+    ) in resposta.text
+    assert (
+        '<button type="submit" name="acao" value="salvar" '
+        'class="botao">Salvar</button>'
+    ) in resposta.text
+    assert resposta.text.count('class="campo"') == 6
+    assert 'class="cores-grade"' in resposta.text
+    assert 'class="admin-editar"' in resposta.text
+    assert 'role="alert"' not in resposta.text
+    assert "card-erro" not in resposta.text
+
+
+def test_erro_de_validacao_do_time_aparece_como_alerta(com_senha, cliente):
+    _logar(cliente)
+
+    resposta = _editar(
+        cliente, 1, nome="", faixas="1", cor_1="#ff0000", acao="salvar"
+    )
+
+    assert resposta.status_code == 400
+    assert '<ul class="erros" role="alert">' in resposta.text
+    assert "card-erro" in resposta.text

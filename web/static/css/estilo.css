@@ -1182,13 +1182,15 @@ td {
 }
 
 .confirmar-exclusao,
-.confirmar-restauracao {
+.confirmar-restauracao,
+.admin-login {
     margin-top: calc(var(--espacamento) * 1.5);
     margin-bottom: calc(var(--espacamento) * 2);
 }
 
 .confirmar-exclusao h1,
-.confirmar-restauracao h1 {
+.confirmar-restauracao h1,
+.admin-login h1 {
     margin: 0 0 var(--espacamento);
     font-size: clamp(1.5rem, 5.5vw, 2rem);
     line-height: 1.15;
@@ -1196,7 +1198,8 @@ td {
 
 .saves-vazio .acoes-centro,
 .confirmar-exclusao .acoes-centro,
-.confirmar-restauracao .acoes-centro {
+.confirmar-restauracao .acoes-centro,
+.admin-login .acoes-centro {
     margin-bottom: 0;
 }
 
@@ -1382,6 +1385,128 @@ td {
     font-weight: 700;
     line-height: 1;
     color: var(--cor-acido);
+}
+
+/* Área adm (E-022): login em card estreito, times em grade de cards (só o
+   botão "Editar" é link) e edição em duas colunas no desktop (prévia ao
+   lado do formulário), uma no celular (prévia em cima). O card do login
+   reusa as regras de .confirmar-exclusao (seção Carreiras salvas). */
+/* Erro único em parágrafo: sem o recuo do marcador de lista */
+p.erros {
+    padding-left: var(--espacamento);
+}
+
+.cabecalho-admin .acoes-centro {
+    margin-bottom: 0;
+}
+
+.admin-campeonato {
+    margin-bottom: calc(var(--espacamento) * 2);
+}
+
+.cards-admin-times {
+    grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+    padding: 0;
+    list-style: none;
+}
+
+.card-admin-time {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: var(--espacamento);
+    text-align: center;
+}
+
+.card-admin-time .time {
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 100%;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+/* Botão no pé do card: cards da mesma linha alinham o "Editar" */
+.card-admin-time .botao {
+    margin-top: auto;
+}
+
+.admin-editar {
+    display: grid;
+    gap: var(--espacamento);
+    max-width: 52rem;
+    margin: 0 auto;
+    align-items: start;
+}
+
+.admin-previa {
+    text-align: center;
+}
+
+.admin-previa-escudo {
+    margin: 0 0 var(--espacamento);
+}
+
+.admin-previa-escudo .escudo {
+    margin: 0;
+}
+
+.admin-previa-dica {
+    font-size: 0.9rem;
+    color: var(--cor-texto-suave);
+}
+
+.grupo-campos {
+    min-width: 0;
+    margin: 0 0 var(--espacamento);
+    padding: 0;
+    border: 0;
+}
+
+.grupo-campos legend {
+    margin: 0 0 0.5rem;
+    padding: 0;
+    font-weight: 600;
+}
+
+.grupo-campos .ajuda {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--cor-texto-suave);
+}
+
+/* Dentro do fieldset o espaço final vem da margem do .grupo-campos */
+.opcoes-padrao {
+    margin-bottom: 0;
+}
+
+.opcoes-padrao .opcao {
+    flex: 1;
+}
+
+.cores-grade {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--espacamento);
+}
+
+.cores-grade .campo {
+    margin: 0;
+}
+
+.cores-grade .campo input[type="color"] {
+    width: 100%;
+}
+
+.admin-formulario .acoes-centro {
+    margin-bottom: 0;
+}
+
+@media (min-width: 48rem) {
+    .admin-editar {
+        grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+    }
 }
 
 .acoes {

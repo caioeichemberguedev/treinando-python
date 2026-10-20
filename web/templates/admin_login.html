@@ -3,15 +3,22 @@
 {% block titulo %}Área adm — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Área adm</h1>
+    <section class="card card-estreito admin-login{% if erro %} card-erro{% endif %}">
+        <p class="rotulo">Acesso restrito</p>
+        <h1>Área adm</h1>
 
-    {% if erro %}
-        <p role="alert">{{ erro }}</p>
-    {% endif %}
+        {% if erro %}
+            <p class="erros" role="alert">{{ erro }}</p>
+        {% endif %}
 
-    <form method="post" action="{{ url_for('entrar_admin') }}">
-        <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" required autocomplete="current-password">
-        <button type="submit" class="botao">Entrar</button>
-    </form>
+        <form method="post" action="{{ url_for('entrar_admin') }}">
+            <div class="campo">
+                <label for="senha">Senha</label>
+                <input type="password" id="senha" name="senha" required autocomplete="current-password">
+            </div>
+            <div class="acoes-centro">
+                <button type="submit" class="botao">Entrar</button>
+            </div>
+        </form>
+    </section>
 {% endblock %}

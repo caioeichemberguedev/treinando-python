@@ -3,29 +3,28 @@
 {% block titulo %}Área adm — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Área adm: times</h1>
-
-    <form method="post" action="{{ url_for('sair_admin') }}">
-        <button type="submit" class="botao">Sair</button>
-    </form>
+    <header class="cabecalho-tela cabecalho-admin">
+        <p class="rotulo">Área adm</p>
+        <h1>Times</h1>
+        <p class="subtitulo">Nome, cores e padrão do escudo valem em todas as carreiras.</p>
+        <div class="acoes-centro">
+            <form method="post" action="{{ url_for('sair_admin') }}">
+                <button type="submit" class="botao botao-secundario">Sair</button>
+            </form>
+        </div>
+    </header>
 
     {% for campeonato, ids in campeonatos.items() %}
-        <h2>{{ campeonato }}</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Nome e cores</th>
-                </tr>
-            </thead>
-            <tbody>
+        <section class="admin-campeonato">
+            <h2 class="titulo-secao">{{ campeonato }}</h2>
+            <ul class="cards cards-admin-times">
             {% for id_time in ids %}
-                <tr>
-                    <td><span class="time">{{ escudo(id_time, 40) }}{{ nome_time(id_time) }}</span></td>
-                    <td><a href="{{ url_for('tela_editar_time_admin', id_time=id_time) }}" class="botao">Editar</a></td>
-                </tr>
+                <li class="card card-admin-time">
+                    <span class="time">{{ escudo(id_time, 40) }}{{ nome_time(id_time) }}</span>
+                    <a href="{{ url_for('tela_editar_time_admin', id_time=id_time) }}" class="botao botao-secundario botao-pequeno">Editar<span class="visualmente-oculto"> {{ nome_time(id_time) }}</span></a>
+                </li>
             {% endfor %}
-            </tbody>
-        </table>
+            </ul>
+        </section>
     {% endfor %}
 {% endblock %}
