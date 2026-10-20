@@ -85,7 +85,7 @@ def _jogar_ate_campeao(jogo):
 
 
 def _celulas(html):
-    return dict(re.findall(r"<tr><th>([^<]+)</th><td>(.*?)</td></tr>", html))
+    return dict(re.findall(r"<dt>([^<]+)</dt><dd>(.*?)</dd>", html))
 
 
 def _assert_estatisticas(html, temporadas, id_time):

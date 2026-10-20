@@ -341,7 +341,7 @@ def test_carregar_no_meio_da_temporada_ficha_soma_o_titulo_do_jogador():
     esperado = 2 + (1 if jogo.campeao.id == 901 else 0)
 
     html = client.get("/carreira").text
-    assert f"<th>Títulos</th><td>{esperado}</td>" in html
+    assert f"<dt>Títulos</dt><dd>{esperado}</dd>" in html
 
 
 def test_carregar_entre_temporadas_sorteia_com_o_proprio_time_escolhido():
@@ -363,7 +363,7 @@ def test_carregar_entre_temporadas_sorteia_com_o_proprio_time_escolhido():
     assert resposta.status_code == 303
     assert _esta_na_lista(jogo.time_escolhido, jogo.classificados)
     assert _esta_na_lista(jogo.time_escolhido, jogo.times_do_campeonato)
-    assert f"<th>Títulos</th><td>{esperado}</td>" in client.get("/carreira").text
+    assert f"<dt>Títulos</dt><dd>{esperado}</dd>" in client.get("/carreira").text
 
 
 # --- E-014-T5: fases da temporada em andamento ---------------------------------

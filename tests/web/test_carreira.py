@@ -261,7 +261,7 @@ def test_ficha_mostra_os_dados_do_time_escolhido():
     assert "R$ 1,234,567" in html
     assert "89,012" in html
     assert "77/100" in html
-    assert "<th>Títulos</th><td>3</td>" in html
+    assert "<dt>Títulos</dt><dd>3</dd>" in html
     assert "Torcedores" in html
 
 
@@ -272,7 +272,7 @@ def test_botoes_jogar_proxima_fase_e_voltar_ao_menu():
     html = client.get("/carreira").text
 
     assert re.search(r'<a class="botao" href="[^"]*/fase">Jogar próxima fase</a>', html)
-    assert re.search(r'<a class="botao" href="http://testserver/">Voltar ao menu</a>', html)
+    assert re.search(r'<a class="botao botao-secundario" href="http://testserver/">Voltar ao menu</a>', html)
 
 
 def test_nome_do_save_aparece_so_quando_existe():
@@ -354,7 +354,7 @@ AVISO_INCOMPLETO = "Algumas fases não foram registradas"
 
 
 def _celula(rotulo, valor):
-    return f"<tr><th>{rotulo}</th><td>{valor}</td></tr>"
+    return f"<dt>{rotulo}</dt><dd>{valor}</dd>"
 
 
 def _jogo_com_historico(historico=HISTORICO_DUAS_TEMPORADAS, temporada=2028, **kwargs):
@@ -543,3 +543,108 @@ def test_get_carreira_com_estatisticas_nao_altera_historico_nem_fases():
 
     assert json.dumps(jogo.historico) == historico_antes
     assert json.dumps(jogo.fases_da_temporada) == fases_antes
+
+
+# --- E-022-T7: dashboard em cards -------------------------------------------
+
+
+def _secao(html, titulo):
+    return html.split(f"<h2>{titulo}</h2>", 1)[1].split("</section>", 1)[0]
+
+
+PROGRESSO = re.compile(r"Fase \d+ de \d+")
+
+
+def test_dashboard_em_cards_com_metricas_na_ficha_e_nas_estatisticas():
+    times = _times(4)
+    estado.iniciar_jogo("Copa Teste", times[0], 2026, times)
+
+    html = client.get("/carreira").text
+
+    assert 'class="cards"' in html
+    assert '<header class="cabecalho-tela' in html
+    assert '<span class="chip">Copa Teste</span>' in html
+    assert '<span class="chip">Temporada 2026</span>' in html
+    assert _secao(html, "Ficha do time").count('<div class="metrica') == 4
+    assert _secao(html, "Estatísticas da carreira").count('<div class="metrica') == 8
+    assert '<div class="metrica metrica-texto"><dt>Melhor campanha</dt>' in html
+    assert "<table>" not in _secao(html, "Ficha do time")
+    assert 'class="painel"' not in html
+
+
+def test_proximo_jogo_com_dezesseis_times_mostra_fase_1_de_4_e_placar():
+    times = _dezesseis_times()
+    estado.iniciar_jogo("Copa Teste", times[0], 2026, list(times), times_do_campeonato=times)
+
+    proximo = _secao(client.get("/carreira").text, "Próximo jogo")
+
+    assert '<span class="chip chip-acido">Fase 1 de 4</span>' in proximo
+    assert 'class="placar placar-proximo-jogo"' in proximo
+    assert '<span class="placar-x">x</span>' in proximo
+    assert re.search(r'<a class="botao" href="[^"]*/fase">Jogar próxima fase</a>', proximo)
+
+
+def test_sem_times_do_campeonato_nao_mostra_progresso_da_fase():
+    times = _times(4)
+    estado.iniciar_jogo("Copa Teste", times[0], 2026, times)
+
+    assert not PROGRESSO.search(client.get("/carreira").text)
+
+
+def test_bye_mostra_chip_de_progresso():
+    times = _times(3)
+    estado.iniciar_jogo("Copa Teste", times[2], 2026, list(times), times_do_campeonato=times)
+
+    proximo = _secao(client.get("/carreira").text, "Próximo jogo")
+
+    assert "Fase 1 de 2" in proximo
+    assert f"<p>{nome_da_fase(1)}: seu time avança direto.</p>" in proximo
+
+
+def test_eliminado_tem_chip_de_erro():
+    _novo_jogo_com_fase_decidida(jogador_vence=False)
+
+    proximo = _secao(client.get("/carreira").text, "Próximo jogo")
+
+    assert 'class="chip chip-erro"' in proximo
+    assert not PROGRESSO.search(proximo)
+
+
+def test_temporada_encerrada_tem_chip_destaque_e_o_botao_no_card():
+    _jogo_com_historico()
+    jogo = estado.obter_jogo()
+    jogo.campeao = jogo.time_escolhido
+
+    html = client.get("/carreira").text
+    proximo = _secao(html, "Próximo jogo")
+
+    assert '<section class="card card-largo card-proximo-jogo card-destaque">' in html
+    assert 'class="chip chip-destaque"' in proximo
+    assert "Ir para a temporada 2029" in proximo
+
+
+def test_voltar_ao_menu_e_botao_secundario_fora_dos_cards():
+    times = _times(4)
+    estado.iniciar_jogo("Copa Teste", times[0], 2026, times)
+
+    html = client.get("/carreira").text
+    depois_dos_cards = html.split('<div class="acoes acoes-centro">', 1)[1]
+
+    assert '<a class="botao botao-secundario" href="http://testserver/">Voltar ao menu</a>' in depois_dos_cards
+
+
+def test_temporada_encerrada_com_outro_campeao_tem_chip_sem_destaque_no_card():
+    times = _times(4)
+    jogo = estado.iniciar_jogo("Copa Teste", times[0], 2026, [times[1]])
+    jogo.campeao = times[1]
+
+    html = client.get("/carreira").text
+    proximo = _secao(html, "Próximo jogo")
+
+    assert '<section class="card card-largo card-proximo-jogo">' in html
+    assert "card-destaque" not in html
+    assert '<span class="chip chip-destaque">Fim da temporada</span>' in proximo
+    assert "Temporada 2026 encerrada." in proximo
+    assert "Você foi campeão!" not in proximo
+    assert re.search(r'<form method="post" action="[^"]*/campeao/continuar">', proximo)
+    assert "Jogar próxima fase" not in html

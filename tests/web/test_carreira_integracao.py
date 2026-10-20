@@ -104,7 +104,7 @@ def _times_do_proximo_jogo(html):
 
 
 def _celulas(html):
-    return dict(re.findall(r"<tr><th>([^<]+)</th><td>(.*?)</td></tr>", html))
+    return dict(re.findall(r"<dt>([^<]+)</dt><dd>(.*?)</dd>", html))
 
 
 def _linhas_do_historico(html):
@@ -224,7 +224,7 @@ def test_temporada_inteira_pelo_dashboard_proximo_jogo_bate_com_a_fase(semente, 
         adversario = _adversario_pendente(jogo)
         fase = jogo.fase_atual["nome_fase"].split(" - ")[0]
         assert nomes == [catalogo.nome_para_exibir(jogo.time_escolhido), catalogo.nome_para_exibir(adversario)]
-        assert f"{fase}:" in _secao(html, "Próximo jogo")
+        assert f'<p class="rotulo">{fase}</p>' in _secao(html, "Próximo jogo")
         fases_previstas.append(fase)
 
         _disputar(monkeypatch, vencer=True)
@@ -360,7 +360,7 @@ def test_carreira_do_terminal_carregada_na_web_abre_o_dashboard_com_a_temporada_
     assert AVISO_INCOMPLETO not in html
     if passou_das_oitavas:
         assert len(_times_do_proximo_jogo(html)) == 2
-        assert f"{nome_da_fase(4)}:" in _secao(html, "Próximo jogo")
+        assert f'<p class="rotulo">{nome_da_fase(4)}</p>' in _secao(html, "Próximo jogo")
     else:
         assert f"<p>Eliminado na {OITAVAS}.</p>" in html  # as oitavas vieram do save
 

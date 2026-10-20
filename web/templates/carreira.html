@@ -3,107 +3,124 @@
 {% block titulo %}Carreira — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Carreira</h1>
-    <p>{{ campeonato }} — Temporada {{ temporada }}</p>
-    <p class="destaque"><span class="time">{{ escudo(time_escolhido, 48) }}{{ nome_time(time_escolhido) }}</span></p>
-    {% if nome_save %}
-        <p>Carreira: <strong>{{ nome_save }}</strong> — salva automaticamente a cada fase.</p>
-    {% endif %}
+    <header class="cabecalho-tela cabecalho-carreira">
+        <p class="rotulo">Carreira</p>
+        <h1><span class="time">{{ escudo(time_escolhido, 48) }}{{ nome_time(time_escolhido) }}</span></h1>
+        <p class="chips">
+            <span class="chip">{{ campeonato }}</span>
+            <span class="chip">Temporada {{ temporada }}</span>
+        </p>
+        {% if nome_save %}
+            <p class="subtitulo">Carreira: <strong>{{ nome_save }}</strong> — salva automaticamente a cada fase.</p>
+        {% endif %}
+    </header>
 
-    <section class="painel">
-        <h2>Próximo jogo</h2>
-        {% if proximo_jogo.situacao == "encerrada" %}
-            <p>Temporada {{ temporada }} encerrada.</p>
-            <p>Campeão: <span class="time">{{ escudo(proximo_jogo.campeao, 20) }}{{ nome_time(proximo_jogo.campeao) }}</span></p>
-            {% if proximo_jogo.jogador_foi_campeao %}
-                <p>Você foi campeão!</p>
-            {% endif %}
-        {% elif proximo_jogo.situacao == "jogo" %}
-            <p>{{ proximo_jogo.nome_fase }}:
-                <span class="time">{{ escudo(time_escolhido, 20) }}{{ nome_time(time_escolhido) }}</span>
-                x
-                <span class="time">{{ escudo(proximo_jogo.adversario, 20) }}{{ nome_time(proximo_jogo.adversario) }}</span>
-            </p>
-        {% elif proximo_jogo.situacao == "bye" %}
-            <p>{{ proximo_jogo.nome_fase }}: seu time avança direto.</p>
-        {% else %}
-            {% if proximo_jogo.rotulo_eliminacao %}
-                <p>{{ proximo_jogo.rotulo_eliminacao }}.</p>
+    <div class="cards">
+        {% set campeao_e_o_jogador = proximo_jogo.situacao == "encerrada" and proximo_jogo.jogador_foi_campeao %}
+        <section class="card card-largo card-proximo-jogo{% if campeao_e_o_jogador %} card-destaque{% endif %}">
+            <h2>Próximo jogo</h2>
+            {% if proximo_jogo.situacao == "encerrada" %}
+                <p class="chips"><span class="chip chip-destaque">{% if campeao_e_o_jogador %}Campeão{% else %}Fim da temporada{% endif %}</span></p>
+                <p>Temporada {{ temporada }} encerrada.</p>
+                <p>Campeão: <span class="time">{{ escudo(proximo_jogo.campeao, 20) }}{{ nome_time(proximo_jogo.campeao) }}</span></p>
+                {% if proximo_jogo.jogador_foi_campeao %}
+                    <p>Você foi campeão!</p>
+                {% endif %}
+            {% elif proximo_jogo.situacao == "jogo" %}
+                <div class="proximo-jogo-topo">
+                    <p class="rotulo">{{ proximo_jogo.nome_fase }}</p>
+                    {% if proximo_jogo.progresso %}
+                        <span class="chip chip-acido">Fase {{ proximo_jogo.progresso.numero }} de {{ proximo_jogo.progresso.total }}</span>
+                    {% endif %}
+                </div>
+                <div class="placar placar-proximo-jogo">
+                    <span class="time">{{ escudo(time_escolhido, 48) }}{{ nome_time(time_escolhido) }}</span>
+                    <span class="placar-x">x</span>
+                    <span class="time">{{ escudo(proximo_jogo.adversario, 48) }}{{ nome_time(proximo_jogo.adversario) }}</span>
+                </div>
+            {% elif proximo_jogo.situacao == "bye" %}
+                {% if proximo_jogo.progresso %}
+                    <p class="chips"><span class="chip chip-acido">Fase {{ proximo_jogo.progresso.numero }} de {{ proximo_jogo.progresso.total }}</span></p>
+                {% endif %}
+                <p>{{ proximo_jogo.nome_fase }}: seu time avança direto.</p>
             {% else %}
-                <p>Eliminado nesta temporada.</p>
+                <p class="chips"><span class="chip chip-erro">Fora da disputa</span></p>
+                {% if proximo_jogo.rotulo_eliminacao %}
+                    <p>{{ proximo_jogo.rotulo_eliminacao }}.</p>
+                {% else %}
+                    <p>Eliminado nesta temporada.</p>
+                {% endif %}
+                <p>A temporada segue sem o seu time.</p>
             {% endif %}
-            <p>A temporada segue sem o seu time.</p>
-        {% endif %}
-    </section>
-
-    <section class="painel">
-        <h2>Ficha do time</h2>
-        <table>
-            <tbody>
-                <tr><th>Finanças</th><td>R$ {{ "{:,}".format(time_escolhido.financas) }}</td></tr>
-                <tr><th>Torcedores</th><td>{{ "{:,}".format(time_escolhido.fas) }}</td></tr>
-                <tr><th>Força</th><td>{{ time_escolhido.forca }}/100</td></tr>
-                <tr><th>Títulos</th><td>{{ time_escolhido.titulos }}</td></tr>
-            </tbody>
-        </table>
-    </section>
-
-    {% set resumo = estatisticas.resumo %}
-    <section class="painel">
-        <h2>Estatísticas da carreira</h2>
-        {% if estatisticas.incompleto %}
-            <p class="aviso">Algumas fases não foram registradas (temporada salva no meio por uma versão antiga do jogo) — as estatísticas podem estar incompletas.</p>
-        {% endif %}
-        <table>
-            <tbody>
-                <tr><th>Jogos</th><td>{{ resumo.jogos }}</td></tr>
-                <tr><th>Vitórias</th><td>{{ resumo.vitorias }}</td></tr>
-                <tr><th>Derrotas</th><td>{{ resumo.derrotas }}</td></tr>
-                <tr><th>Aproveitamento</th><td>{% if resumo.aproveitamento is none %}—{% else %}{{ "%.1f"|format(resumo.aproveitamento) }}%{% endif %}</td></tr>
-                <tr><th>Gols de pênalti marcados</th><td>{{ resumo.gols_marcados }}</td></tr>
-                <tr><th>Gols de pênalti sofridos</th><td>{{ resumo.gols_sofridos }}</td></tr>
-                <tr><th>Títulos na carreira</th><td>{{ resumo.titulos }}</td></tr>
-                <tr><th>Melhor campanha</th><td>{% if estatisticas.melhor %}{{ estatisticas.melhor.rotulo }} ({{ estatisticas.melhor.temporadas|join(", ") }}){% else %}Nenhuma temporada concluída ainda{% endif %}</td></tr>
-            </tbody>
-        </table>
-    </section>
-
-    <section class="painel">
-        <h2>Histórico da carreira</h2>
-        {% if not estatisticas.linhas %}
-            <p>Nenhuma temporada registrada ainda.</p>
-        {% else %}
-            <div class="tabela-rolavel">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Temporada</th>
-                            <th>Campanha</th>
-                            <th>Campeão</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for linha in estatisticas.linhas %}
-                        <tr>
-                            <td>{% if linha.indice %}<a href="{{ url_for('tela_historico_jogos', indice=linha.indice) }}">{{ linha.campanha.temporada }}</a>{% else %}{{ linha.campanha.temporada }}{% endif %}</td>
-                            <td>{{ linha.campanha.rotulo }}</td>
-                            <td>{% if linha.campeao is none %}—{% else %}<span class="time">{{ escudo(linha.campeao, 20) }}{{ nome_time(linha.campeao) }}</span>{% endif %}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+            <div class="acoes-centro">
+                {% if proximo_jogo.situacao == "encerrada" %}
+                    <form method="post" action="{{ url_for('continuar_para_proxima_temporada') }}">
+                        <button type="submit" class="botao">Ir para a temporada {{ temporada + 1 }}</button>
+                    </form>
+                {% else %}
+                    <a class="botao" href="{{ url_for('tela_fase') }}">Jogar próxima fase</a>
+                {% endif %}
             </div>
-        {% endif %}
-    </section>
+        </section>
 
-    <div class="acoes">
-        {% if proximo_jogo.situacao == "encerrada" %}
-            <form method="post" action="{{ url_for('continuar_para_proxima_temporada') }}">
-                <button type="submit" class="botao">Ir para a temporada {{ temporada + 1 }}</button>
-            </form>
-        {% else %}
-            <a class="botao" href="{{ url_for('tela_fase') }}">Jogar próxima fase</a>
-        {% endif %}
-        <a class="botao" href="{{ url_for('inicio') }}">Voltar ao menu</a>
+        <section class="card">
+            <h2>Ficha do time</h2>
+            <dl class="metricas metricas-ficha">
+                <div class="metrica"><dt>Finanças</dt><dd>R$ {{ "{:,}".format(time_escolhido.financas) }}</dd></div>
+                <div class="metrica"><dt>Torcedores</dt><dd>{{ "{:,}".format(time_escolhido.fas) }}</dd></div>
+                <div class="metrica"><dt>Força</dt><dd>{{ time_escolhido.forca }}/100</dd></div>
+                <div class="metrica"><dt>Títulos</dt><dd>{{ time_escolhido.titulos }}</dd></div>
+            </dl>
+        </section>
+
+        {% set resumo = estatisticas.resumo %}
+        <section class="card">
+            <h2>Estatísticas da carreira</h2>
+            {% if estatisticas.incompleto %}
+                <p class="aviso">Algumas fases não foram registradas (temporada salva no meio por uma versão antiga do jogo) — as estatísticas podem estar incompletas.</p>
+            {% endif %}
+            <dl class="metricas metricas-carreira">
+                <div class="metrica"><dt>Jogos</dt><dd>{{ resumo.jogos }}</dd></div>
+                <div class="metrica"><dt>Vitórias</dt><dd>{{ resumo.vitorias }}</dd></div>
+                <div class="metrica"><dt>Derrotas</dt><dd>{{ resumo.derrotas }}</dd></div>
+                <div class="metrica"><dt>Aproveitamento</dt><dd>{% if resumo.aproveitamento is none %}—{% else %}{{ "%.1f"|format(resumo.aproveitamento) }}%{% endif %}</dd></div>
+                <div class="metrica"><dt>Gols de pênalti marcados</dt><dd>{{ resumo.gols_marcados }}</dd></div>
+                <div class="metrica"><dt>Gols de pênalti sofridos</dt><dd>{{ resumo.gols_sofridos }}</dd></div>
+                <div class="metrica"><dt>Títulos na carreira</dt><dd>{{ resumo.titulos }}</dd></div>
+                <div class="metrica metrica-texto"><dt>Melhor campanha</dt><dd>{% if estatisticas.melhor %}{{ estatisticas.melhor.rotulo }} ({{ estatisticas.melhor.temporadas|join(", ") }}){% else %}Nenhuma temporada concluída ainda{% endif %}</dd></div>
+            </dl>
+        </section>
+
+        <section class="card card-largo">
+            <h2>Histórico da carreira</h2>
+            {% if not estatisticas.linhas %}
+                <p>Nenhuma temporada registrada ainda.</p>
+            {% else %}
+                <div class="tabela-rolavel">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Temporada</th>
+                                <th scope="col">Campanha</th>
+                                <th scope="col">Campeão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for linha in estatisticas.linhas %}
+                            <tr>
+                                <td>{% if linha.indice %}<a href="{{ url_for('tela_historico_jogos', indice=linha.indice) }}">{{ linha.campanha.temporada }}</a>{% else %}{{ linha.campanha.temporada }}{% endif %}</td>
+                                <td>{{ linha.campanha.rotulo }}</td>
+                                <td>{% if linha.campeao is none %}—{% else %}<span class="time">{{ escudo(linha.campeao, 20) }}{{ nome_time(linha.campeao) }}</span>{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <div class="acoes acoes-centro">
+        <a class="botao botao-secundario" href="{{ url_for('inicio') }}">Voltar ao menu</a>
     </div>
 {% endblock %}

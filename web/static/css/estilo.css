@@ -724,9 +724,87 @@ td {
     border-bottom: 0;
 }
 
-/* Dashboard da carreira (E-019) */
-.painel {
-    margin: var(--espacamento) 0;
+/* Linha de chips (cabeçalho de tela, topo de card) */
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+}
+
+/* Carreira (E-022): dashboard em cards. Próximo jogo e histórico ocupam a
+   linha inteira; ficha e estatísticas ficam lado a lado no desktop. */
+.cabecalho-carreira h1 .time {
+    justify-content: center;
+    max-width: 100%;
+}
+
+.cabecalho-carreira .chips {
+    margin-bottom: 0.5rem;
+}
+
+.card-proximo-jogo .chips {
+    justify-content: flex-start;
+}
+
+.proximo-jogo-topo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 var(--espacamento);
+}
+
+.proximo-jogo-topo .rotulo {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--cor-texto);
+}
+
+/* "Você x adversário": nomes quebram dentro da coluna, nunca estouram 320 px */
+.placar-proximo-jogo {
+    max-width: 32rem;
+    margin: 0 auto;
+    gap: 0.75rem;
+}
+
+.placar-proximo-jogo .time {
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1.25;
+}
+
+.placar-proximo-jogo .placar-x {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.card-proximo-jogo .acoes-centro {
+    margin-bottom: 0;
+}
+
+/* Ficha: finanças (número mais longo) na linha inteira, valores um pouco menores */
+.metricas-ficha {
+    grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+}
+
+.metricas-ficha .metrica:first-child,
+.metricas-carreira .metrica-texto {
+    grid-column: 1 / -1;
+}
+
+.metricas-ficha dd {
+    font-size: clamp(1.2rem, 4.5vw, 1.6rem);
+}
+
+/* Dentro do card a moldura já existe: sem borda/fundo próprios (evita borda dupla) */
+.card .tabela-rolavel {
+    margin: 0;
+    background-color: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .acoes {
