@@ -430,3 +430,92 @@ def test_tela_editar_equipe_de_teste_mantem_nome_do_equipes_json(equipes_de_test
 
     assert resposta.status_code == 200
     assert "Editar Time A" in resposta.text
+
+
+# --- Visual E-022-T13: estrutura que o CSS e a acessibilidade usam ---
+
+AVISO = "As alterações valem só para carreiras novas — cada carreira salva guarda sua própria cópia dos times."
+
+
+def test_erro_de_validacao_na_edicao_aparece_como_alerta():
+    dados = {"financas": "-1", "fas": "1000", "forca": "50"}
+    resposta = client.post("/equipes/Campeonato Teste/901/editar", data=dados)
+
+    assert resposta.status_code == 400
+    assert '<ul class="erros" role="alert">' in resposta.text
+    assert "card-erro" in resposta.text
+
+
+def test_edicao_sem_erro_nao_tem_alerta_nem_card_de_erro():
+    resposta = client.get("/equipes/Campeonato Teste/901/editar")
+
+    assert 'role="alert"' not in resposta.text
+    assert "card-erro" not in resposta.text
+    assert resposta.text.count('class="campo"') == 3
+    assert 'for="campo-financas"' in resposta.text
+    assert 'id="campo-financas"' in resposta.text
+
+
+def test_link_de_restaurar_e_botao_de_perigo():
+    resposta = client.get("/equipes")
+
+    assert 'href="http://testserver/equipes/restaurar" class="botao botao-perigo"' in resposta.text
+
+
+def test_tela_equipes_mostra_um_bloco_por_campeonato():
+    resposta = client.get("/equipes")
+
+    assert resposta.text.count('class="bloco"') == 2
+    assert 'class="cabecalho-tela"' in resposta.text
+
+
+def test_confirmar_restauracao_tem_perigo_e_cancelar_secundario():
+    resposta = client.get("/equipes/restaurar")
+
+    assert '<button type="submit" class="botao botao-perigo">Confirmar restauração</button>' in resposta.text
+    assert 'class="botao botao-secundario" href="http://testserver/equipes">Cancelar</a>' in resposta.text
+    assert '<form method="post" action="http://testserver/equipes/restaurar">' in resposta.text
+
+
+def test_tabela_de_equipes_rola_dentro_do_card_e_editar_e_secundario():
+    resposta = client.get("/equipes/Campeonato Teste")
+
+    assert 'class="tabela-rolavel"' in resposta.text
+    assert 'scope="col"' in resposta.text
+    assert resposta.text.count('class="botao botao-secundario botao-pequeno"') == 2
+    assert f'<p class="aviso aviso-equipes">{AVISO}</p>' in resposta.text
+
+
+@pytest.mark.parametrize(
+    "caminho",
+    ["/equipes", "/equipes/Campeonato Teste", "/equipes/restaurar", "/equipes/Campeonato Teste/901/editar"],
+)
+def test_telas_de_equipes_nao_usam_lista_escolha(caminho):
+    resposta = client.get(caminho)
+
+    assert resposta.status_code == 200
+    assert "lista-escolha" not in resposta.text
+
+
+def test_forca_101_mostra_alerta_e_nao_salva(equipes_de_teste):
+    dados = {"financas": "1000", "fas": "1000", "forca": "101"}
+    resposta = client.post("/equipes/Campeonato Teste/901/editar", data=dados)
+
+    assert resposta.status_code == 400
+    assert '<ul class="erros" role="alert">' in resposta.text
+    assert _equipe_salva(equipes_de_teste, "Campeonato Teste", 901)["forca"] == 50
+
+
+def test_aviso_de_carreiras_novas_tem_o_mesmo_texto_no_terminal_e_na_web(monkeypatch, capsys):
+    import menu
+    from web.rotas.equipes import AVISO_CARREIRAS_NOVAS
+
+    equipes = {"Campeonato Teste": [Equipe(nome="Time A", id=901)]}
+    respostas = iter(["1", "v", "n"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(respostas))
+    monkeypatch.setattr(persistencia, "salvar_equipes", lambda *_: None)
+
+    menu.editar_equipes(equipes)
+
+    assert AVISO_CARREIRAS_NOVAS == AVISO
+    assert AVISO_CARREIRAS_NOVAS in capsys.readouterr().out

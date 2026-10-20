@@ -3,36 +3,46 @@
 {% block titulo %}Equipes: {{ campeonato }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Equipes: {{ campeonato }}</h1>
+    <header class="cabecalho-tela">
+        <p class="rotulo">Editar equipes</p>
+        <h1>Equipes: {{ campeonato }}</h1>
+    </header>
 
-    <p>{{ aviso }}</p>
+    <p class="aviso aviso-equipes">{{ aviso }}</p>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Nome</th>
-                <th>Finanças</th>
-                <th>Fãs</th>
-                <th>Força</th>
-                <th>Títulos</th>
-                <th>Finanças/fãs/força</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for time in times %}
-            <tr>
-                <td><span class="time">{{ escudo(time, 20) }}{{ nome_time(time) }}</span></td>
-                <td>R$ {{ "{:,}".format(time.financas) }}</td>
-                <td>{{ "{:,}".format(time.fas) }}</td>
-                <td>{{ time.forca }}/100</td>
-                <td>{{ time.titulos }}</td>
-                <td>
-                    <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, id_equipe=time.id) }}" class="botao">Editar</a>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <section class="card card-equipes">
+        <h2>Times do campeonato</h2>
+        <div class="tabela-rolavel">
+            <table class="tabela-equipes">
+                <thead>
+                    <tr>
+                        <th scope="col">Nome</th>
+                        <th scope="col" class="numero">Finanças</th>
+                        <th scope="col" class="numero">Fãs</th>
+                        <th scope="col" class="numero">Força</th>
+                        <th scope="col" class="numero">Títulos</th>
+                        <th scope="col"><span class="visualmente-oculto">Ações</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for time in times %}
+                    <tr>
+                        <td><span class="time">{{ escudo(time, 20) }}{{ nome_time(time) }}</span></td>
+                        <td class="numero">R$ {{ "{:,}".format(time.financas) }}</td>
+                        <td class="numero">{{ "{:,}".format(time.fas) }}</td>
+                        <td class="numero">{{ time.forca }}/100</td>
+                        <td class="numero">{{ time.titulos }}</td>
+                        <td class="coluna-acao">
+                            <a href="{{ url_for('tela_editar_equipe', campeonato=campeonato, id_equipe=time.id) }}" class="botao botao-secundario botao-pequeno">Editar<span class="visualmente-oculto"> {{ nome_time(time) }}</span></a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <p><a href="{{ url_for('tela_equipes') }}">Voltar aos campeonatos</a></p>
+    <div class="acoes-centro">
+        <a class="botao botao-secundario" href="{{ url_for('tela_equipes') }}">Voltar aos campeonatos</a>
+    </div>
 {% endblock %}

@@ -1164,7 +1164,8 @@ td {
 }
 
 .saves-vazio,
-.confirmar-exclusao {
+.confirmar-exclusao,
+.confirmar-restauracao {
     text-align: center;
 }
 
@@ -1180,19 +1181,94 @@ td {
     color: var(--cor-texto-suave);
 }
 
-.confirmar-exclusao {
+.confirmar-exclusao,
+.confirmar-restauracao {
     margin-top: calc(var(--espacamento) * 1.5);
     margin-bottom: calc(var(--espacamento) * 2);
 }
 
-.confirmar-exclusao h1 {
+.confirmar-exclusao h1,
+.confirmar-restauracao h1 {
     margin: 0 0 var(--espacamento);
     font-size: clamp(1.5rem, 5.5vw, 2rem);
     line-height: 1.15;
 }
 
 .saves-vazio .acoes-centro,
-.confirmar-exclusao .acoes-centro {
+.confirmar-exclusao .acoes-centro,
+.confirmar-restauracao .acoes-centro {
+    margin-bottom: 0;
+}
+
+/* Equipes (E-022): campeonatos em blocos, "Restaurar" isolado num card com
+   botão de perigo, tabela de times rolando dentro do card e formulário
+   estreito. A confirmação de restauração reusa o visual da de exclusão. */
+.restaurar-equipes {
+    text-align: center;
+}
+
+.restaurar-equipes p {
+    margin: 0;
+    color: var(--cor-texto-suave);
+}
+
+.restaurar-equipes .acoes-centro {
+    margin-bottom: 0;
+}
+
+.aviso-equipes,
+.card-equipes {
+    max-width: 52rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.aviso-equipes {
+    margin-top: 0;
+    margin-bottom: var(--espacamento);
+}
+
+/* Largura mínima: no celular a tabela rola dentro do card em vez de espremer */
+.tabela-equipes {
+    min-width: 38rem;
+}
+
+.tabela-equipes .numero {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tabela-equipes td,
+.tabela-equipes th {
+    vertical-align: middle;
+}
+
+.tabela-equipes .coluna-acao {
+    text-align: right;
+    width: 1%;
+}
+
+.editar-equipe {
+    margin-top: calc(var(--espacamento) * 1.5);
+    margin-bottom: calc(var(--espacamento) * 2);
+}
+
+.editar-equipe h1 {
+    margin: 0 0 var(--espacamento);
+    font-size: clamp(1.4rem, 5vw, 1.9rem);
+    line-height: 1.2;
+}
+
+.editar-equipe h1 .time {
+    gap: 0.6rem;
+    max-width: 100%;
+}
+
+.editar-equipe .aviso {
+    margin: 0 0 var(--espacamento);
+}
+
+.editar-equipe .acoes-centro {
     margin-bottom: 0;
 }
 

@@ -3,39 +3,37 @@
 {% block titulo %}Editar {{ nome_time(equipe) }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1><span class="time">{{ escudo(equipe, 40) }}Editar {{ nome_time(equipe) }}</span></h1>
+    <section class="card card-estreito editar-equipe{% if erros %} card-erro{% endif %}">
+        <p class="rotulo">{{ campeonato }}</p>
+        <h1><span class="time">{{ escudo(equipe, 40) }}Editar {{ nome_time(equipe) }}</span></h1>
 
-    <p>{{ aviso }}</p>
+        <p class="aviso">{{ aviso }}</p>
 
-    {% if erros %}
-        <ul>
-        {% for erro in erros %}
-            <li><strong>{{ erro }}</strong></li>
-        {% endfor %}
-        </ul>
-    {% endif %}
+        {% if erros %}
+            <ul class="erros" role="alert">
+            {% for erro in erros %}
+                <li>{{ erro }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
 
-    <form method="post" action="{{ url_for('editar_equipe', campeonato=campeonato, id_equipe=equipe.id) }}">
-        <p>
-            <label>
-                Finanças (R$):
-                <input type="number" name="financas" min="0" step="1" value="{{ equipe.financas }}" required>
-            </label>
-        </p>
-        <p>
-            <label>
-                Fãs:
-                <input type="number" name="fas" min="0" step="1" value="{{ equipe.fas }}" required>
-            </label>
-        </p>
-        <p>
-            <label>
-                Força (0 a 100):
-                <input type="number" name="forca" min="0" max="100" step="1" value="{{ equipe.forca }}" required>
-            </label>
-        </p>
-        <button type="submit" class="botao">Salvar</button>
-    </form>
-
-    <p><a href="{{ url_for('tela_equipes_campeonato', campeonato=campeonato) }}">Voltar às equipes de {{ campeonato }}</a></p>
+        <form method="post" action="{{ url_for('editar_equipe', campeonato=campeonato, id_equipe=equipe.id) }}">
+            <div class="campo">
+                <label for="campo-financas">Finanças (R$)</label>
+                <input type="number" id="campo-financas" name="financas" min="0" step="1" value="{{ equipe.financas }}" required>
+            </div>
+            <div class="campo">
+                <label for="campo-fas">Fãs</label>
+                <input type="number" id="campo-fas" name="fas" min="0" step="1" value="{{ equipe.fas }}" required>
+            </div>
+            <div class="campo">
+                <label for="campo-forca">Força (0 a 100)</label>
+                <input type="number" id="campo-forca" name="forca" min="0" max="100" step="1" value="{{ equipe.forca }}" required>
+            </div>
+            <div class="acoes-centro">
+                <a class="botao botao-secundario" href="{{ url_for('tela_equipes_campeonato', campeonato=campeonato) }}">Voltar às equipes de {{ campeonato }}</a>
+                <button type="submit" class="botao">Salvar</button>
+            </div>
+        </form>
+    </section>
 {% endblock %}
