@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -406,3 +407,55 @@ def test_carregar_save_entre_temporadas_comeca_sem_fases_e_grava_vazio():
 
     assert estado.obter_jogo().fases_da_temporada == []
     assert persistencia.carregar_jogo_salvo("1_01_01_2026")["fases_da_temporada"] == []
+
+
+# --- E-022-T12: carreiras salvas em cards ---
+
+
+def test_t12_lista_de_saves_em_cards_com_excluir_de_perigo():
+    _criar_save("1_01_01_2026", temporada=2027)
+
+    texto = client.get("/saves").text
+
+    assert 'class="cabecalho-tela"' in texto
+    assert texto.count('class="card card-save"') == 1
+    assert '<span class="chip">Campeonato Teste</span>' in texto
+    assert '<span class="chip chip-acido">Temporada 2027</span>' in texto
+    assert 'class="save-arquivo"' in texto
+    assert re.search(
+        r'<a href="[^"]*/saves/1_01_01_2026/excluir" class="botao botao-perigo botao-pequeno"[^>]*>Excluir</a>',
+        texto,
+    )
+    assert '<form method="post" action="http://testserver/saves/1_01_01_2026/carregar">' in texto
+    assert re.search(r'<button type="submit" class="botao"[^>]*>Continuar</button>', texto)
+    assert "<table" not in texto
+
+
+def test_t12_um_card_por_carreira():
+    _criar_save("1_01_01_2026")
+    _criar_save("2_01_01_2026")
+
+    texto = client.get("/saves").text
+
+    assert texto.count('class="card card-save"') == 2
+    assert texto.count('class="escudo"') == 2
+
+
+def test_t12_lista_vazia_em_card_com_link_para_novo_jogo():
+    texto = client.get("/saves").text
+
+    assert 'class="card card-estreito saves-vazio"' in texto
+    assert "Nenhuma carreira salva" in texto
+    assert re.search(r'<a class="botao" href="[^"]*/novo-jogo">Novo jogo</a>', texto)
+    assert "card-save" not in texto
+
+
+def test_t12_confirmacao_de_exclusao_em_card_de_erro():
+    _criar_save("1_01_01_2026")
+
+    texto = client.get("/saves/1_01_01_2026/excluir").text
+
+    assert 'class="card card-estreito card-erro' in texto
+    assert '<form method="post" action="http://testserver/saves/1_01_01_2026/excluir">' in texto
+    assert '<button type="submit" class="botao botao-perigo">Confirmar exclusão</button>' in texto
+    assert re.search(r'<a class="botao botao-secundario" href="[^"]*/saves">Cancelar</a>', texto)

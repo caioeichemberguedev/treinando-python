@@ -1111,6 +1111,91 @@ td {
     }
 }
 
+/* Carreiras salvas (E-022): um card por carreira, conteúdo centralizado.
+   "Continuar" é o primário; "Excluir" (perigo, pequeno) fica ao lado. */
+.saves {
+    padding: 0;
+    list-style: none;
+}
+
+.card-save {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+}
+
+.card-save > * {
+    margin: 0;
+}
+
+/* Vence o rótulo HUD de .card > h2 (0,2,0 > 0,1,1), inclusive a margem:
+   aqui o título é o time e o espaçamento vem do gap */
+.card-save > .save-time {
+    max-width: 100%;
+    margin: 0;
+    font-family: var(--fonte-texto);
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.25;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--cor-texto);
+}
+
+.save-time .time {
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 100%;
+}
+
+.save-arquivo {
+    font-family: var(--fonte-numeros);
+    font-size: 0.85rem;
+    color: var(--cor-texto-suave);
+}
+
+/* Empurra as ações para o pé do card (cards da linha com alturas iguais) */
+.card-save > .acoes-save {
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 0.25rem;
+}
+
+.saves-vazio,
+.confirmar-exclusao {
+    text-align: center;
+}
+
+.saves-vazio {
+    margin-bottom: calc(var(--espacamento) * 2);
+}
+
+.saves-vazio p {
+    margin: 0 0 0.5rem;
+}
+
+.saves-vazio .saves-vazio-dica {
+    color: var(--cor-texto-suave);
+}
+
+.confirmar-exclusao {
+    margin-top: calc(var(--espacamento) * 1.5);
+    margin-bottom: calc(var(--espacamento) * 2);
+}
+
+.confirmar-exclusao h1 {
+    margin: 0 0 var(--espacamento);
+    font-size: clamp(1.5rem, 5.5vw, 2rem);
+    line-height: 1.15;
+}
+
+.saves-vazio .acoes-centro,
+.confirmar-exclusao .acoes-centro {
+    margin-bottom: 0;
+}
+
 .acoes {
     display: flex;
     flex-wrap: wrap;
