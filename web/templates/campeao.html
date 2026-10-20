@@ -3,18 +3,42 @@
 {% block titulo %}Campeão — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>🏆 Campeão da {{ campeonato }} {{ temporada }}</h1>
-    <p class="destaque"><span class="time">{{ escudo(campeao, 96) }}{{ nome_time(campeao) }}</span></p>
+    <div class="campeao">
+        <section class="card card-destaque card-campeao">
+            <p class="rotulo">Campeão · {{ campeonato }} {{ temporada }}</p>
+            <h1>Campeão da {{ campeonato }} {{ temporada }}</h1>
+            <p class="destaque"><span class="time">{{ escudo(campeao, 96) }}{{ nome_time(campeao) }}</span></p>
+            <p class="chips">
+                {% if jogador_foi_campeao %}
+                    <span class="chip chip-destaque">Você foi campeão</span>
+                {% else %}
+                    <span class="chip">Seu time não foi campeão</span>
+                {% endif %}
+            </p>
+        </section>
 
-    {% if jogador_foi_campeao %}
-        <p>🎉 PARABÉNS! Você foi campeão!</p>
-    {% else %}
-        <p>😢 Você não foi campeão.</p>
-    {% endif %}
+        {% if final %}
+            <section class="card card-final">
+                <h2>Final (pênaltis)</h2>
+                <div class="placar placar-final">
+                    <div class="placar-lado{% if final.id_vencedor == final.id_a %} confronto-vencedor{% endif %}">
+                        <span class="time">{{ escudo(final.id_a, 20) }}{{ nome_time(final.id_a) }}</span>
+                        {% if final.id_vencedor == final.id_a %}<span class="chip chip-destaque">Campeão</span>{% endif %}
+                    </div>
+                    <span class="placar-gols">{{ final.gols_a }}<span class="placar-x"> x </span>{{ final.gols_b }}</span>
+                    <div class="placar-lado{% if final.id_vencedor == final.id_b %} confronto-vencedor{% endif %}">
+                        <span class="time">{{ escudo(final.id_b, 20) }}{{ nome_time(final.id_b) }}</span>
+                        {% if final.id_vencedor == final.id_b %}<span class="chip chip-destaque">Campeão</span>{% endif %}
+                    </div>
+                </div>
+            </section>
+        {% endif %}
 
-    <form method="post" action="{{ url_for('continuar_para_proxima_temporada') }}">
-        <button type="submit" class="botao">Seguir</button>
-    </form>
-
-    <a class="botao" href="{{ url_for('inicio') }}">Voltar ao início</a>
+        <div class="acoes-centro">
+            <form method="post" action="{{ url_for('continuar_para_proxima_temporada') }}">
+                <button type="submit" class="botao">Seguir</button>
+            </form>
+            <a class="botao botao-secundario" href="{{ url_for('inicio') }}">Voltar ao início</a>
+        </div>
+    </div>
 {% endblock %}

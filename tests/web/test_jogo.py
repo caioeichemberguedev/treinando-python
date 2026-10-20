@@ -1191,3 +1191,99 @@ def test_t9_cobrar_e_defender_so_aparecem_no_botao():
     assert vez_do_goleiro.count("Defender") == 1
     assert ">Defender</button>" in vez_do_goleiro
     assert "Cobrar" not in vez_do_goleiro
+
+
+# --- Campeão em card com placar da final (E-022-T10) ------------------------------
+
+def _jogar_temporada_de_teste_ate_o_campeao():
+    """Campeonato Teste tem 2 times: a primeira fase já é a final."""
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
+    _passar_pela_fase_atual()
+    assert client.post("/fase/seguir", follow_redirects=False).headers["location"] == "/campeao"
+    return estado.obter_jogo()
+
+
+def _bloco_do_placar_da_final(texto):
+    return texto.split('class="placar placar-final"')[1].split("</section>")[0]
+
+
+def test_t10_campeao_sem_emojis_e_em_card_destaque():
+    _jogar_temporada_de_teste_ate_o_campeao()
+
+    texto = client.get("/campeao").text
+
+    for emoji in ("🏆", "🎉", "😢"):
+        assert emoji not in texto
+    assert 'class="card card-destaque card-campeao"' in texto
+    assert "Campeão · Campeonato Teste 2026" in texto
+    assert "<h1>Campeão da Campeonato Teste 2026</h1>" in texto
+
+
+def test_t10_campeao_mostra_o_placar_da_final_com_os_dois_finalistas():
+    jogo = _jogar_temporada_de_teste_ate_o_campeao()
+    id_a, id_b, _, gols_a, gols_b = jogo.historico[-1]["fases"][-1]["confrontos"][0]
+
+    texto = client.get("/campeao").text
+
+    assert "<h2>Final (pênaltis)</h2>" in texto
+    placar = _bloco_do_placar_da_final(texto)
+    assert f'<span class="placar-gols">{gols_a}<span class="placar-x"> x </span>{gols_b}</span>' in placar
+    # Os finalistas saem do histórico (ids), então o nome vem do catálogo.
+    assert f">{catalogo.nome_para_exibir(id_a)}</span>" in placar
+    assert f">{catalogo.nome_para_exibir(id_b)}</span>" in placar
+    assert placar.count('height="20"') == 2
+
+
+def test_t10_campeao_marca_o_vencedor_da_final():
+    jogo = _jogar_temporada_de_teste_ate_o_campeao()
+    id_a, _, id_vencedor, _, _ = jogo.historico[-1]["fases"][-1]["confrontos"][0]
+
+    placar = _bloco_do_placar_da_final(client.get("/campeao").text)
+
+    lados = re.findall(r'<div class="placar-lado( confronto-vencedor)?">', placar)
+    assert len(lados) == 2
+    esperado = [" confronto-vencedor", ""] if id_vencedor == id_a else ["", " confronto-vencedor"]
+    assert lados == esperado
+    # O campeão também é marcado em texto (chip), não só por negrito/cor.
+    assert placar.count('<span class="chip chip-destaque">Campeão</span>') == 1
+    lado_vencedor = placar.split('confronto-vencedor">')[1].split("</div>")[0]
+    assert '<span class="chip chip-destaque">Campeão</span>' in lado_vencedor
+
+
+def test_t10_campeao_com_historico_vazio_nao_mostra_a_final():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
+    jogo = estado.obter_jogo()
+    jogo.campeao = jogo.time_escolhido
+    assert jogo.historico == []
+
+    resposta = client.get("/campeao")
+
+    assert resposta.status_code == 200
+    assert "Final" not in resposta.text
+    assert "placar-final" not in resposta.text
+
+
+def test_t10_campeao_chip_conforme_o_jogador_foi_ou_nao_campeao():
+    client.post("/novo-jogo/time", data={"campeonato": "Campeonato Teste", "time": "901"})
+    jogo = estado.obter_jogo()
+
+    jogo.campeao = jogo.time_escolhido
+    venceu = client.get("/campeao").text
+    jogo.campeao = next(t for t in jogo.times_do_campeonato if t != jogo.time_escolhido)
+    perdeu = client.get("/campeao").text
+
+    assert '<span class="chip chip-destaque">Você foi campeão</span>' in venceu
+    assert "Seu time não foi campeão" not in venceu
+    assert '<span class="chip">Seu time não foi campeão</span>' in perdeu
+    assert "Você foi campeão" not in perdeu
+
+
+def test_t10_campeao_tem_seguir_primario_e_voltar_secundario():
+    _jogar_temporada_de_teste_ate_o_campeao()
+
+    texto = client.get("/campeao").text
+
+    assert '<form method="post" action="http://testserver/campeao/continuar">' in texto
+    assert '<button type="submit" class="botao">Seguir</button>' in texto
+    assert re.search(r'<a class="botao botao-secundario" href="[^"]*/">Voltar ao início</a>', texto)
+    assert 'class="acoes-centro"' in texto

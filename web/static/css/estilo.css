@@ -1043,6 +1043,74 @@ td {
     }
 }
 
+/* Campeão (E-022): card hero âmbar centralizado + placar da final.
+   Na final, o campeão leva o chip "Campeão" (texto, não só negrito/cor). */
+.campeao {
+    display: grid;
+    gap: var(--espacamento);
+    max-width: 40rem;
+    margin: calc(var(--espacamento) * 1.5) auto calc(var(--espacamento) * 2);
+}
+
+.card-campeao {
+    padding: calc(var(--espacamento) * 2) calc(var(--espacamento) * 1.25);
+    text-align: center;
+}
+
+.card-campeao h1 {
+    margin: 0 0 var(--espacamento);
+    font-size: clamp(1.5rem, 5.5vw, 2.25rem);
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.card-campeao .destaque {
+    margin: 0 0 var(--espacamento);
+    font-family: var(--fonte-texto);
+    font-size: clamp(1.5rem, 6vw, 2rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.card-campeao .destaque .time {
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 100%;
+}
+
+.card-campeao .chips {
+    margin: 0;
+}
+
+.placar-final {
+    gap: 0.75rem;
+}
+
+.placar-final .placar-gols {
+    font-size: clamp(2rem, 9vw, 3rem);
+}
+
+.placar-final .time {
+    line-height: 1.25;
+    color: var(--cor-texto-suave);
+}
+
+.placar-final .confronto-vencedor .time {
+    font-weight: 700;
+    color: var(--cor-texto);
+}
+
+.campeao .acoes-centro {
+    margin: 0;
+}
+
+/* Celular: como na fase, o placar empilha (time, gols, time) para o chip caber */
+@media (max-width: 30rem) {
+    .placar-final {
+        grid-template-columns: 1fr;
+    }
+}
+
 .acoes {
     display: flex;
     flex-wrap: wrap;
