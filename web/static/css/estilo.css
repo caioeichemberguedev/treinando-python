@@ -1272,6 +1272,118 @@ td {
     margin-bottom: 0;
 }
 
+/* Histórico (E-022): cada tabela num card e rolando dentro dele em 320 px.
+   As células não têm atributo (testes, decisão 2): placar/números em mono e
+   vencedor/títulos em ácido só por seletor de coluna. */
+.card-historico,
+.historico-cards {
+    max-width: 52rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.historico-cards {
+    display: grid;
+    gap: var(--espacamento);
+}
+
+.historico-vazio {
+    text-align: center;
+    color: var(--cor-texto-suave);
+}
+
+.historico-vazio p {
+    margin: 0;
+}
+
+.tabela-historico td,
+.tabela-jogos td,
+.tabela-classificacao td,
+.tabela-campeoes td,
+.tabela-titulos td {
+    vertical-align: middle;
+}
+
+/* Largura mínima: no celular a tabela rola dentro do card em vez de espremer */
+.tabela-historico {
+    min-width: 32rem;
+}
+
+.tabela-jogos {
+    min-width: 36rem;
+}
+
+/* # e temporada (histórico), temporada (campeões): números em mono */
+.tabela-historico td:nth-child(-n+2),
+.tabela-campeoes td:first-child {
+    font-family: var(--fonte-numeros);
+    white-space: nowrap;
+}
+
+.tabela-historico td:first-child {
+    width: 1%;
+    color: var(--cor-texto-suave);
+}
+
+/* Campeão / vencedor em ácido (contraste 7.9 sobre o card) */
+.tabela-historico td:nth-child(3) .time,
+.tabela-jogos td:nth-child(4) .time,
+.tabela-campeoes td:nth-child(2) .time,
+.tabela-classificacao tbody tr:first-child td:nth-child(2) .time {
+    font-weight: 700;
+    color: var(--cor-acido);
+}
+
+.tabela-historico td:nth-child(4) {
+    width: 1%;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.tabela-historico th:nth-child(4) {
+    text-align: right;
+}
+
+.tabela-historico td:nth-child(4) .botao + .botao {
+    margin-left: 0.4rem;
+}
+
+/* Placar "4 x 5": mono, centralizado, sem quebrar */
+.tabela-jogos th:nth-child(2),
+.tabela-jogos td:nth-child(2) {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.tabela-jogos td:nth-child(2) {
+    font-family: var(--fonte-numeros);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+/* Rótulo da fase quebra entre palavras ("Oitavas de / final"), nunca no meio */
+.tabela-classificacao td:first-child {
+    width: 35%;
+    font-weight: 700;
+    overflow-wrap: normal;
+}
+
+/* Títulos por time: número em mono grande, alinhado à direita */
+.tabela-titulos th:nth-child(2),
+.tabela-titulos td:nth-child(2) {
+    width: 1%;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tabela-titulos td:nth-child(2) {
+    font-family: var(--fonte-numeros);
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--cor-acido);
+}
+
 .acoes {
     display: flex;
     flex-wrap: wrap;

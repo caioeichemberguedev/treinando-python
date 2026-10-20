@@ -3,38 +3,51 @@
 {% block titulo %}Histórico — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Histórico de temporadas</h1>
+    <header class="cabecalho-tela">
+        <p class="rotulo">Carreira</p>
+        <h1>Histórico de temporadas</h1>
+        <p class="subtitulo">Campeões de cada temporada concluída, com os jogos e a classificação final.</p>
+    </header>
 
     {% if not historico %}
-        <p>Nenhuma temporada concluída ainda.</p>
+        <section class="card card-estreito historico-vazio">
+            <p>Nenhuma temporada concluída ainda.</p>
+        </section>
     {% else %}
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Temporada</th>
-                    <th>Campeão</th>
-                    <th>Detalhes</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for temporada_info in historico %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ temporada_info.temporada }}</td>
-                    <td><span class="time">{{ escudo(temporada_info.campeao, 20) }}{{ nome_time(temporada_info.campeao) }}</span></td>
-                    <td>
-                        <a href="{{ url_for('tela_historico_jogos', indice=loop.index) }}">Jogos</a>
-                        |
-                        <a href="{{ url_for('tela_historico_classificacao', indice=loop.index) }}">Classificação</a>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-
-        <p><a href="{{ url_for('tela_campeoes') }}">Ver campeões e títulos por time</a></p>
+        <section class="card card-historico">
+            <h2>Temporadas concluídas</h2>
+            <div class="tabela-rolavel">
+                <table class="tabela-historico">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Temporada</th>
+                            <th scope="col">Campeão</th>
+                            <th scope="col">Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for temporada_info in historico %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ temporada_info.temporada }}</td>
+                            <td><span class="time">{{ escudo(temporada_info.campeao, 20) }}{{ nome_time(temporada_info.campeao) }}</span></td>
+                            <td>
+                                <a class="botao botao-secundario botao-pequeno" href="{{ url_for('tela_historico_jogos', indice=loop.index) }}">Jogos<span class="visualmente-oculto"> da temporada {{ temporada_info.temporada }}</span></a>
+                                <a class="botao botao-secundario botao-pequeno" href="{{ url_for('tela_historico_classificacao', indice=loop.index) }}">Classificação<span class="visualmente-oculto"> da temporada {{ temporada_info.temporada }}</span></a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     {% endif %}
 
-    <p><a href="{{ url_for('inicio') }}">Voltar ao início</a></p>
+    <div class="acoes acoes-centro">
+        {% if historico %}
+            <a class="botao" href="{{ url_for('tela_campeoes') }}">Ver campeões e títulos por time</a>
+        {% endif %}
+        <a class="botao botao-secundario" href="{{ url_for('inicio') }}">Voltar ao início</a>
+    </div>
 {% endblock %}

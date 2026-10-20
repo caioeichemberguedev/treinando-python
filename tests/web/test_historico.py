@@ -536,3 +536,100 @@ def test_navegacao_sem_jogo_em_novo_jogo_nao_tem_link_para_historico():
 
 def test_historico_direto_pela_url_sem_jogo_continua_404():
     assert client.get("/historico").status_code == 404
+
+
+# --- E-022-T14: histórico em cards com tabelas roláveis --------------------
+
+
+@pytest.mark.parametrize(
+    "url", ["/historico", "/historico/1/jogos", "/historico/1/classificacao",
+            "/campeoes"],
+)
+def test_telas_de_historico_tem_tabela_rolavel_em_card(url):
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get(url).text
+
+    assert 'class="cabecalho-tela"' in texto
+    assert 'class="tabela-rolavel"' in texto
+    assert 'scope="col"' in texto
+    assert "<th>" not in texto
+
+
+def test_jogos_tem_um_card_por_fase():
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get("/historico/1/jogos").text
+
+    assert texto.count('class="tabela-rolavel"') == 2
+    assert texto.count('<table class="tabela-jogos">') == 2
+
+
+def test_campeoes_tem_as_duas_tabelas_em_cards():
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get("/campeoes").text
+
+    assert texto.count('class="tabela-rolavel"') == 2
+    assert '<table class="tabela-titulos">' in texto
+
+
+def test_historico_detalhes_viram_botoes_secundarios():
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get("/historico").text
+
+    assert re.search(
+        r'<a class="botao botao-secundario botao-pequeno" '
+        r'href="http://testserver/historico/1/jogos">Jogos',
+        texto,
+    )
+    assert re.search(
+        r'<a class="botao botao-secundario botao-pequeno" '
+        r'href="http://testserver/historico/1/classificacao">Classificação',
+        texto,
+    )
+    assert re.search(
+        r'<div class="acoes acoes-centro">\s*'
+        r'<a class="botao" href="http://testserver/campeoes">'
+        r'Ver campeões e títulos por time</a>',
+        texto,
+    )
+    assert "Voltar ao início</a>" in texto
+
+
+def test_historico_vazio_nao_mostra_tabela_nem_link_de_campeoes():
+    _iniciar_jogo_com_historico([])
+
+    texto = client.get("/historico").text
+
+    assert "Nenhuma temporada concluída ainda" in texto
+    assert "<table" not in texto
+    assert 'href="http://testserver/campeoes"' not in texto
+    assert "Voltar ao início</a>" in texto
+
+
+def test_jogos_de_temporada_sem_fases_mostra_mensagem():
+    _iniciar_jogo_com_historico([{"temporada": 2026, "campeao": SAO_PAULO, "fases": []}])
+
+    texto = client.get("/historico/1/jogos").text
+
+    assert "Nenhum jogo registrado nesta temporada." in texto
+    assert "<table" not in texto
+
+
+@pytest.mark.parametrize(
+    "url", ["/historico/1/jogos", "/historico/2/classificacao", "/campeoes"],
+)
+def test_subtelas_tem_botao_voltar_ao_historico_que_funciona(url):
+    # O menu do topo também aponta para /historico: o assert casa o botão.
+    _iniciar_jogo_com_historico(_historico_com_titulos_repetidos())
+
+    texto = client.get(url).text
+
+    assert re.search(
+        r'<a class="botao botao-secundario" '
+        r'href="http://testserver/historico">Voltar ao histórico</a>',
+        texto,
+    )
+    assert client.get("/historico").status_code == 200

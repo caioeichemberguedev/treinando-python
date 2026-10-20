@@ -3,32 +3,47 @@
 {% block titulo %}Jogos da temporada {{ temporada }} — Jogo de Futebol{% endblock %}
 
 {% block conteudo %}
-    <h1>Jogos da temporada {{ temporada }}</h1>
-    <p>Campeão: <strong class="time">{{ escudo(campeao, 20) }}{{ nome_time(campeao) }}</strong></p>
+    <header class="cabecalho-tela">
+        <p class="rotulo">Histórico</p>
+        <h1>Jogos da temporada {{ temporada }}</h1>
+        <p class="subtitulo">Campeão: <strong class="time">{{ escudo(campeao, 20) }}{{ nome_time(campeao) }}</strong></p>
+    </header>
 
+    <div class="historico-cards">
     {% for fase in fases %}
-        <h2>{{ fase.nome_fase }}</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Mandante</th>
-                    <th>Placar</th>
-                    <th>Visitante</th>
-                    <th>Vencedor</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for time_a, time_b, vencedor, gols_a, gols_b in fase.confrontos %}
-                <tr>
-                    <td><span class="time">{{ escudo(time_a, 20) }}{{ nome_time(time_a) }}</span></td>
-                    <td>{{ gols_a }} x {{ gols_b }}</td>
-                    <td><span class="time">{{ escudo(time_b, 20) }}{{ nome_time(time_b) }}</span></td>
-                    <td><span class="time">{{ escudo(vencedor, 20) }}{{ nome_time(vencedor) }}</span></td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        <section class="card">
+            <h2>{{ fase.nome_fase }}</h2>
+            <div class="tabela-rolavel">
+                <table class="tabela-jogos">
+                    <thead>
+                        <tr>
+                            <th scope="col">Mandante</th>
+                            <th scope="col">Placar</th>
+                            <th scope="col">Visitante</th>
+                            <th scope="col">Vencedor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for time_a, time_b, vencedor, gols_a, gols_b in fase.confrontos %}
+                        <tr>
+                            <td><span class="time">{{ escudo(time_a, 20) }}{{ nome_time(time_a) }}</span></td>
+                            <td>{{ gols_a }} x {{ gols_b }}</td>
+                            <td><span class="time">{{ escudo(time_b, 20) }}{{ nome_time(time_b) }}</span></td>
+                            <td><span class="time">{{ escudo(vencedor, 20) }}{{ nome_time(vencedor) }}</span></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% else %}
+        <section class="card card-estreito historico-vazio">
+            <p>Nenhum jogo registrado nesta temporada.</p>
+        </section>
     {% endfor %}
+    </div>
 
-    <p><a href="{{ url_for('tela_historico') }}">Voltar ao histórico</a></p>
+    <div class="acoes-centro">
+        <a class="botao botao-secundario" href="{{ url_for('tela_historico') }}">Voltar ao histórico</a>
+    </div>
 {% endblock %}
