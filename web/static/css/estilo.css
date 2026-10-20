@@ -913,6 +913,136 @@ td {
     }
 }
 
+/* Pênaltis (E-022): placar grande, bolinhas por cobrança e cantos em cards.
+   Bolinha: gol = cheia; perdeu = vazada com risco (não depende só da cor). */
+.penaltis {
+    display: grid;
+    gap: var(--espacamento);
+    max-width: 40rem;
+    margin: 0 auto calc(var(--espacamento) * 2);
+}
+
+.placar-penaltis {
+    gap: 0.75rem;
+}
+
+.placar-penaltis .time {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.linha-cobrancas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--cor-linha);
+}
+
+.linha-cobrancas:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.linha-cobrancas .time {
+    min-width: 0;
+}
+
+.cobrancas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cobranca {
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid var(--cor-acido);
+    border-radius: 50%;
+}
+
+.cobranca-gol {
+    background-color: var(--cor-acido);
+}
+
+.cobranca-perdeu {
+    border-color: var(--cor-erro);
+    background-image: linear-gradient(45deg, transparent 43%, var(--cor-erro) 43%, var(--cor-erro) 57%, transparent 57%);
+}
+
+.cobrancas-vazio {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--cor-texto-suave);
+}
+
+.escolha-canto {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.escolha-canto legend {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Esquerdo | meio | direito lado a lado; "Aleatório" na linha inteira */
+.opcoes-cantos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.opcao-canto {
+    flex: 1;
+    justify-content: center;
+    min-height: 3.5rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.opcoes-cantos > li:not(.opcao-aleatoria) .opcao-canto {
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 5rem;
+    padding: 0.75rem 0.5rem;
+}
+
+.opcao-aleatoria {
+    grid-column: 1 / -1;
+}
+
+.card-vez .acoes-centro {
+    margin-bottom: 0;
+}
+
+/* 320 px: com 2 dígitos ("10 x 10") os dois escudos de 48 px não cabem ao lado do placar */
+@media (max-width: 22rem) {
+    .placar-penaltis {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Até ~384 px: três cards não cabem "esquerdo" sem quebrar a palavra */
+@media (max-width: 24rem) {
+    .opcoes-cantos {
+        grid-template-columns: 1fr;
+    }
+
+    .opcoes-cantos > li:not(.opcao-aleatoria) .opcao-canto {
+        flex-direction: row;
+        min-height: 3.5rem;
+    }
+}
+
 .acoes {
     display: flex;
     flex-wrap: wrap;

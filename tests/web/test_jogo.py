@@ -733,7 +733,7 @@ def test_penaltis_mostra_escudo_do_jogador_e_do_adversario():
     assert resposta.status_code == 200
     assert 'aria-label="Escudo do Time A"' in resposta.text
     assert 'aria-label="Escudo do Time B"' in resposta.text
-    assert _contar_escudos(resposta.text) == 4  # 2 no topo (40) + 2 no placar (20)
+    assert _contar_escudos(resposta.text) == 4  # 2 no placar (48) + 2 nas linhas de cobranças (20)
     for cor in CORES_TIME_A + CORES_TIME_B:
         assert cor in resposta.text
 
@@ -1092,3 +1092,102 @@ def test_t8_fase_sem_tabela_e_com_cabecalho_em_cards():
     assert 'class="cabecalho-tela cabecalho-fase"' in texto
     assert "Copa Teste · Temporada 2026" in texto
     assert 'class="acoes-centro"' in texto
+
+
+# --- Pênaltis com placar grande e cantos em cards (E-022-T9) ----------------------
+
+def test_t9_penaltis_tem_placar_grande_e_sem_tabela():
+    _iniciar_disputa_de_teste()
+
+    texto = client.get("/fase/penaltis").text
+
+    assert 'class="placar placar-penaltis"' in texto
+    assert '<span class="placar-gols">0<span class="placar-x"> x </span>0</span>' in texto
+    assert texto.count('height="48"') == 2
+    assert "<table" not in texto
+    assert "Campeonato Teste · Temporada 2026" in texto
+
+
+def test_t9_penaltis_sem_cobrancas_mostra_o_vazio_nas_duas_linhas():
+    _iniciar_disputa_de_teste()
+
+    texto = client.get("/fase/penaltis").text
+
+    assert texto.count("Ainda sem cobranças") == 2
+    assert "cobranca-gol" not in texto
+    assert "cobranca-perdeu" not in texto
+
+
+def test_t9_bolinhas_batem_com_as_sequencias_e_tem_texto_oculto():
+    estado_disputa = _iniciar_disputa_de_teste()
+    client.post("/fase/penaltis", data={"canto": "1"})
+
+    texto = client.get("/fase/penaltis").text
+
+    total = len(estado_disputa["sequencia_a"]) + len(estado_disputa["sequencia_b"])
+    assert total == 1
+    assert texto.count("cobranca-gol") + texto.count("cobranca-perdeu") == total
+    bolinhas = re.findall(r'<li class="cobranca (cobranca-gol|cobranca-perdeu)">(.*?)</li>', texto)
+    assert len(bolinhas) == total
+    for classe, conteudo in bolinhas:
+        oculto = "gol" if classe == "cobranca-gol" else "perdeu"
+        assert conteudo == f'<span class="visualmente-oculto">{oculto}</span>'
+    assert texto.count("Ainda sem cobranças") == 1
+
+
+def test_t9_bolinha_segue_o_resultado_de_cada_cobranca():
+    estado_disputa = _iniciar_disputa_de_teste()
+    client.post("/fase/penaltis", data={"canto": "1"})
+    client.post("/fase/penaltis", data={"canto": "2"})
+
+    texto = client.get("/fase/penaltis").text
+
+    sequencias = estado_disputa["sequencia_a"] + estado_disputa["sequencia_b"]
+    assert texto.count("cobranca-gol") == sequencias.count("🟢")
+    assert texto.count("cobranca-perdeu") == sequencias.count("🔴")
+    assert "🟢" not in texto and "🔴" not in texto
+
+
+def test_t9_tres_cantos_e_aleatorio_dentro_das_opcoes():
+    _iniciar_disputa_de_teste()
+
+    texto = client.get("/fase/penaltis").text
+
+    assert texto.count('class="opcoes opcoes-cantos"') == 1
+    opcoes = texto.split('class="opcoes opcoes-cantos"')[1].split("</ul>")[0]
+    valores = [re.search(r'value="([^"]*)"', tag).group(1) for tag in _radios_de_canto(opcoes)]
+    assert valores == ["1", "2", "3", "aleatorio"]
+    assert opcoes.count('class="opcao opcao-canto"') == 4
+    for nome in ["Canto esquerdo", "Meio", "Canto direito", "Aleatório"]:
+        assert nome in opcoes
+    assert "lista-escolha" not in texto
+
+
+@pytest.mark.parametrize("cantos_antes, rotulo, pergunta", [
+    ([], "Sua vez de bater", "Escolha o canto do seu chute:"),
+    (["1"], "Vez do seu goleiro", "Para qual canto seu goleiro vai pular?"),
+])
+def test_t9_rotulo_da_vez_conforme_o_turno(cantos_antes, rotulo, pergunta):
+    _iniciar_disputa_de_teste()
+    for canto in cantos_antes:
+        client.post("/fase/penaltis", data={"canto": canto})
+
+    texto = client.get("/fase/penaltis").text
+
+    assert f"<h2>{rotulo}</h2>" in texto
+    assert f"<legend>{pergunta}</legend>" in texto
+
+
+def test_t9_cobrar_e_defender_so_aparecem_no_botao():
+    _iniciar_disputa_de_teste()
+
+    vez_do_chute = client.get("/fase/penaltis").text
+    assert vez_do_chute.count("Cobrar") == 1
+    assert ">Cobrar</button>" in vez_do_chute
+    assert "Defender" not in vez_do_chute
+
+    client.post("/fase/penaltis", data={"canto": "1"})
+    vez_do_goleiro = client.get("/fase/penaltis").text
+    assert vez_do_goleiro.count("Defender") == 1
+    assert ">Defender</button>" in vez_do_goleiro
+    assert "Cobrar" not in vez_do_goleiro
